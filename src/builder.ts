@@ -33,6 +33,24 @@ export class CacheBuilder<K, V> {
     return this;
   }
 
+  /** Expire entries `ms` after their last write (create/overwrite). */
+  expireAfterWrite(ms: number): this {
+    this.options.expireAfterWrite = ms;
+    return this;
+  }
+
+  /** Expire entries `ms` after their last access (read or write). */
+  expireAfterAccess(ms: number): this {
+    this.options.expireAfterAccess = ms;
+    return this;
+  }
+
+  /** Inject a millisecond time source (default `Date.now`). */
+  clock(clock: () => number): this {
+    this.options.clock = clock;
+    return this;
+  }
+
   removalListener(listener: RemovalListener<K, V>): this {
     this.options.removalListener = listener;
     return this;

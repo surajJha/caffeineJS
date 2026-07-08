@@ -2,7 +2,11 @@
 export type RemovalCause =
   | "explicit" // removed by delete()/invalidate()
   | "replaced" // overwritten by a new value for the same key
+  | "expired" // removed because its TTL elapsed
   | "size"; // evicted by the size/weight policy
+
+/** Monotonic-ish millisecond clock. Injectable for deterministic tests. */
+export type Clock = () => number;
 
 export type RemovalListener<K, V> = (
   key: K,
@@ -18,6 +22,12 @@ export interface CacheStats {
   readonly missCount: number;
   readonly hitRate: number;
   readonly evictionCount: number;
+  /** Successful async loader completions (loading caches only). */
+  readonly loadSuccessCount: number;
+  /** Failed async loader completions (loading caches only). */
+  readonly loadFailureCount: number;
+  /** Total time spent in loaders, in milliseconds. */
+  readonly totalLoadTime: number;
 }
 
 export interface CacheOptions<K, V> {
@@ -35,6 +45,21 @@ export interface CacheOptions<K, V> {
   recordStats?: boolean;
   /** Invoked after an entry is removed, evicted, or replaced. */
   removalListener?: RemovalListener<K, V>;
+  /**
+   * Expire entries this many milliseconds after they were last written
+   * (created or overwritten). Requires a positive integer.
+   */
+  expireAfterWrite?: number;
+  /**
+   * Expire entries this many milliseconds after they were last accessed
+   * (read or written). Requires a positive integer.
+   */
+  expireAfterAccess?: number;
+  /**
+   * Time source in milliseconds. Defaults to `Date.now`. Inject a fake clock
+   * for deterministic TTL tests, or `performance.now` for a monotonic source.
+   */
+  clock?: Clock;
 }
 
 export interface Cache<K, V> {
@@ -50,6 +75,19 @@ export interface Cache<K, V> {
   delete(key: K): boolean;
   /** Removes all entries. */
   clear(): void;
+  /** Alias of {@link get} without loading semantics; returns value or undefined. */
+  getIfPresent(key: K): V | undefined;
+  /** Inserts or updates every `[key, value]` pair. */
+  putAll(entries: Iterable<readonly [K, V]>): void;
+  /** Removes `key`. Alias of {@link delete} that returns void. */
+  invalidate(key: K): void;
+  /** Removes the given keys (or all entries when omitted). */
+  invalidateAll(keys?: Iterable<K>): void;
+  /**
+   * Runs deferred maintenance (TTL reclamation, pending policy work). Safe to
+   * call on runtimes without background timers (edge/serverless).
+   */
+  runMaintenance(): void;
   /** Current number of entries. */
   readonly size: number;
   /** Maximum number of entries. */
@@ -60,4 +98,6 @@ export interface Cache<K, V> {
   values(): IterableIterator<V>;
   entries(): IterableIterator<[K, V]>;
   forEach(fn: (value: V, key: K, cache: Cache<K, V>) => void): void;
+  /** A live `Map`-like read view over the current entries. */
+  asMap(): Map<K, V>;
 }

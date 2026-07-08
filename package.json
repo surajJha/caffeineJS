@@ -29,6 +29,11 @@
       "types": "./dist/estimate.d.ts",
       "import": "./dist/estimate.mjs",
       "require": "./dist/estimate.cjs"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.mjs",
+      "require": "./dist/react.cjs"
     }
   },
   "main": "./dist/index.cjs",
@@ -39,6 +44,14 @@
     "README.md",
     "LICENSE"
   ],
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
@@ -53,10 +66,17 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^2.1.8",
     "fast-check": "^3.23.1",
+    "jsdom": "^29.1.1",
     "lru-cache": "^11.5.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typedoc": "^0.27.6",

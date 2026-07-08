@@ -97,4 +97,45 @@ describe("cache core", () => {
     expect(new Set(c.values())).toEqual(new Set([1, 2]));
     expect(new Set(c.entries())).toEqual(new Set([["a", 1], ["b", 2]] as [string, number][]));
   });
+
+  it("protects frequently-read entries from eviction (batched reads)", () => {
+    // With deferred read maintenance, buffered hits must still influence
+    // admission: a hot key read many times should survive a flood of one-shot
+    // insertions, whereas a never-read key must not.
+    const cap = 100;
+    const c = caffeine<number, number>({ maximumSize: cap }).build();
+    c.set(-1, -1); // hot key
+    c.set(-2, -2); // cold key (never read again)
+    for (let round = 0; round < 1000; round++) {
+      for (let r = 0; r < 20; r++) c.get(-1); // many reads → buffered
+      c.set(1000 + round, round); // churn forces eviction + drains buffer
+    }
+    expect(c.get(-1)).toBe(-1); // hot survivor
+    expect(c.get(-2)).toBeUndefined(); // cold evictee
+  });
+
+  it("stays consistent across interleaved reads, writes and deletes", () => {
+    const cap = 32;
+    const c = caffeine<number, number>({ maximumSize: cap }).build();
+    const model = new Map<number, number>();
+    for (let i = 0; i < 5000; i++) {
+      const op = i % 3;
+      const k = i % 40;
+      if (op === 0) {
+        c.set(k, i);
+        model.set(k, i);
+      } else if (op === 1) {
+        c.get(k); // buffered read
+      } else {
+        c.delete(k);
+        model.delete(k);
+      }
+      expect(c.size).toBeLessThanOrEqual(cap);
+    }
+    // Every key still resident must return the last value written for it.
+    for (const [k, v] of model) {
+      const got = c.get(k);
+      if (got !== undefined) expect(got).toBe(v);
+    }
+  });
 });

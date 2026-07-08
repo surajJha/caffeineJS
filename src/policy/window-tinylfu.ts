@@ -17,6 +17,9 @@ const PROTECTED = 2;
  * probation LRU *victim* and the loser is evicted. This is what lets the cache
  * keep frequently-used items that a plain LRU would drop.
  */
+/** Capacity of the deferred read buffer (power of two). */
+const READ_BUFFER_SIZE = 64;
+
 export class WindowTinyLfu<K, V> {
   private readonly store: SoaStore<K, V>;
   private readonly sketch: FrequencySketch;
@@ -28,9 +31,21 @@ export class WindowTinyLfu<K, V> {
   private probationSize = 0;
   private protectedSize = 0;
 
+  /**
+   * Deferred read buffer (CAFF-017). Cache hits append the accessed slot index
+   * here instead of paying for a sketch increment + LRU reorder inline. The
+   * buffer is drained in a tight batch before any structural mutation and when
+   * it fills. Because reads never free slots, every buffered index stays live
+   * and in the same segment until the next drain — so no generation tokens are
+   * needed to validate entries at drain time.
+   */
+  private readonly readBuffer: Int32Array;
+  private readBufferLen = 0;
+
   constructor(store: SoaStore<K, V>, doorkeeper = true) {
     this.store = store;
     this.sketch = new FrequencySketch(store.capacity, doorkeeper);
+    this.readBuffer = new Int32Array(READ_BUFFER_SIZE);
 
     const capacity = store.capacity;
     this.windowMax = Math.max(1, Math.floor(capacity * 0.01));
@@ -52,14 +67,51 @@ export class WindowTinyLfu<K, V> {
     this.evict(sink);
   }
 
-  /** Called on a cache hit for the live slot `idx`. */
+  /**
+   * Fast-path cache hit: record the access for deferred processing. The actual
+   * sketch increment and LRU reorder happen at the next drain. Consecutive hits
+   * on the same slot are coalesced (the buffer holds each hot index at most
+   * once in a row), which collapses repeated reads of a hot key to a single
+   * bookkeeping step.
+   */
+  onAccessBuffered(idx: number): void {
+    const len = this.readBufferLen;
+    if (len > 0 && this.readBuffer[len - 1] === idx) return; // coalesce repeats
+    if (len >= READ_BUFFER_SIZE) {
+      this.drainRead();
+      this.readBuffer[0] = idx;
+      this.readBufferLen = 1;
+      return;
+    }
+    this.readBuffer[len] = idx;
+    this.readBufferLen = len + 1;
+  }
+
+  /** Applies all buffered reads (sketch increments + LRU reorders) in a batch. */
+  drainRead(): void {
+    const len = this.readBufferLen;
+    if (len === 0) return;
+    const buf = this.readBuffer;
+    for (let k = 0; k < len; k++) {
+      this.applyAccess(buf[k] as number);
+    }
+    this.readBufferLen = 0;
+  }
+
+  /** Immediate cache hit (used on the replace path, when the buffer is empty). */
   onAccess(idx: number): void {
+    this.applyAccess(idx);
+  }
+
+  private applyAccess(idx: number): void {
     this.sketch.increment(this.store.hashAt(idx));
     const seg = this.store.segment[idx];
     if (seg === WINDOW) {
+      if (this.store.front(this.store.WINDOW_HEAD) === idx) return; // already MRU
       this.store.unlink(idx);
       this.store.pushFront(this.store.WINDOW_HEAD, idx);
     } else if (seg === PROTECTED) {
+      if (this.store.front(this.store.PROTECTED_HEAD) === idx) return; // already MRU
       this.store.unlink(idx);
       this.store.pushFront(this.store.PROTECTED_HEAD, idx);
     } else {
@@ -77,6 +129,7 @@ export class WindowTinyLfu<K, V> {
     this.windowSize = 0;
     this.probationSize = 0;
     this.protectedSize = 0;
+    this.readBufferLen = 0;
   }
 
   private decSegment(seg: number): void {

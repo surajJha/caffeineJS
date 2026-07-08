@@ -56,7 +56,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
       if (this.statsEnabled) this.misses++;
       return undefined;
     }
-    this.policy.onAccess(idx);
+    this.policy.onAccessBuffered(idx);
     if (this.statsEnabled) this.hits++;
     return this.store.valueAt(idx);
   }
@@ -67,6 +67,9 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
   }
 
   set(key: K, value: V): void {
+    // Flush deferred reads before any structural change so eviction decisions
+    // and slot lifetimes reflect the most recent access order.
+    this.policy.drainRead();
     const existing = this.store.indexOf(key);
     if (existing !== NIL) {
       const old = this.store.valueAt(existing);
@@ -86,6 +89,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
   }
 
   delete(key: K): boolean {
+    this.policy.drainRead();
     const idx = this.store.indexOf(key);
     if (idx === NIL) return false;
     const value = this.store.valueAt(idx);

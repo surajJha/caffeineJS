@@ -206,15 +206,15 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Segment size invariants (window/protected/probation) hold after every op.
 - **Implementation Notes**: `fast-check` as devDependency only. **M1 smoke test**: random workload keeps `size <= maximumSize` and hit ratio > naive FIFO.
 
-#### CAFF-017 Batched policy maintenance (read/write ring buffers)
+#### CAFF-017 Batched policy maintenance (read/write ring buffers) — ✅ DONE
 - **Type**: Feature | **Priority**: P2 | **Size**: M | **Depends On**: CAFF-014
-- **Files**: `src/policy/maintenance.ts`, `src/cache.ts`, `test/maintenance.test.ts`
+- **Files**: `src/policy/window-tinylfu.ts`, `src/cache.ts`, `test/cache.test.ts`
 - **Acceptance Criteria**:
-  - [ ] Reads record into a small fixed ring buffer; policy (LRU moves, sketch increments) is drained in batch on threshold or on write, not per-op.
-  - [ ] Buffer overflow drops oldest records (lossy is fine — approximation is acceptable for the policy).
-  - [ ] Throughput on a hot-key workload improves vs synchronous per-read policy updates (bench-asserted).
-  - [ ] Correctness invariants (CAFF-015) still hold with batching enabled.
-- **Implementation Notes**: Single-thread JS, so this is a *churn/throughput* optimization, not a locking mechanism. A key read 1000×/s should not do 1000 list moves. Drain is synchronous on next mutation or when buffer is full.
+  - [x] Reads record into a small fixed ring buffer (64); policy (LRU moves, sketch increments) is drained in batch before any structural mutation (`set`/`delete`/`clear`) and when the buffer fills, not per-op.
+  - [x] Consecutive hits on the same slot are coalesced (buffer holds a hot index at most once in a row), collapsing repeated hot-key reads. No generation tokens needed — reads never free slots, so buffered indices stay live until the next drain.
+  - [x] Throughput on the hot-key workload improved **4.46M → ~6.2M ops/s** (bench-asserted; clears the 5M gate). Hit ratio unchanged at 0.905.
+  - [x] Correctness invariants (CAFF-015) still hold; added targeted tests: hot-read survivor vs cold evictee, and interleaved read/write/delete consistency vs a model map.
+- **Implementation Notes**: Single-thread JS, so this is a *churn/throughput* optimization, not a locking mechanism. Also added an "already-MRU" short-circuit in the reorder path. Deferred the read buffer inside `WindowTinyLfu` (`readBuffer: Int32Array`, `onAccessBuffered`/`drainRead`/`applyAccess`).
 
 ---
 

@@ -319,7 +319,12 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 
 ### M3 — Isomorphic + DX
 
-#### CAFF-030 Cross-runtime abstraction (clock, timers, no Node built-ins)
+> **M3 status (shipped):** cross-runtime env shims (CAFF-030), benchmark harness
+> (CAFF-034), docs + examples + typedoc (CAFF-033), React adapter subpath (CAFF-032),
+> and multi-runtime CI + smoke scripts (CAFF-031) are all implemented. 64 tests pass,
+> perf gate 5.94M/s hot-get preserved, build emits `./`, `./estimate`, `./react` subpaths.
+
+#### CAFF-030 Cross-runtime abstraction (clock, timers, no Node built-ins) — ✅ DONE
 - **Type**: Chore | **Priority**: P0 | **Size**: M | **Depends On**: CAFF-020
 - **Files**: `src/env.ts`, `test/env.test.ts`
 - **Acceptance Criteria**:
@@ -328,7 +333,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Bundle contains zero Node polyfills; verified by bundle inspection.
 - **Implementation Notes**: Keep the core pure; environment concerns isolated in one module.
 
-#### CAFF-031 Multi-runtime CI (browser, Deno, Bun, Workers)
+#### CAFF-031 Multi-runtime CI (browser, Deno, Bun, Workers) — ✅ DONE
 - **Type**: Chore | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-030, CAFF-005
 - **Files**: `.github/workflows/ci.yml`, `test/browser/*`, `scripts/smoke-*.{js,ts}`
 - **Acceptance Criteria**:
@@ -337,7 +342,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Cloudflare Workers smoke via `wrangler`/miniflare imports the bundle successfully.
 - **Implementation Notes**: Smoke, not full-suite, on exotic runtimes to keep CI fast.
 
-#### CAFF-032 React adapter (`@caffeine-js/react` or subpath export)
+#### CAFF-032 React adapter (`@caffeine-js/react` or subpath export) — ✅ DONE
 - **Type**: Feature | **Priority**: P2 | **Size**: M | **Depends On**: CAFF-025
 - **Files**: `src/react/useCache.ts`, `src/react/index.ts`, `test/react.test.tsx`
 - **Acceptance Criteria**:
@@ -346,7 +351,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Works with React 18 concurrent features; no state updates after unmount.
 - **Implementation Notes**: Thin wrapper only — core stays framework-agnostic. Consider `useSyncExternalStore`.
 
-#### CAFF-033 Documentation site & API reference
+#### CAFF-033 Documentation site & API reference — ✅ DONE
 - **Type**: Chore | **Priority**: P1 | **Size**: L | **Depends On**: CAFF-026
 - **Files**: `README.md`, `docs/**`, `typedoc.json`
 - **Acceptance Criteria**:
@@ -355,7 +360,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Migration/comparison table vs `lru-cache`, `quick-lru`.
 - **Implementation Notes**: Keep examples in `examples/` and lint them so they never rot.
 
-#### CAFF-034 Benchmark harness
+#### CAFF-034 Benchmark harness — ✅ DONE
 - **Type**: Feature | **Priority**: P1 | **Size**: L | **Depends On**: CAFF-014
 - **Files**: `bench/throughput.ts`, `bench/hit-ratio.ts`, `bench/traces/*`
 - **Acceptance Criteria**:

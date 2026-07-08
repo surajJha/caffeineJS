@@ -2,6 +2,7 @@ import { SoaStore, NIL } from "./store/soa-store.js";
 import { WindowTinyLfu } from "./policy/window-tinylfu.js";
 import { ExpiryPolicy } from "./policy/expiry.js";
 import { hashKey } from "./util/hash.js";
+import { wallClockNow } from "./env.js";
 import type {
   Cache,
   CacheOptions,
@@ -49,7 +50,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
       recordStats = false,
       expireAfterWrite,
       expireAfterAccess,
-      clock = Date.now,
+      clock = wallClockNow,
     } = options;
 
     const weighted = maximumWeight !== undefined;

@@ -1,10 +1,6 @@
 import { CaffeineCache } from "./cache.js";
+import { monotonicNow as now } from "./env.js";
 import type { AsyncCacheOptions, AsyncLoadingCache, AsyncLoader, BulkLoader } from "./types.js";
-
-const now: () => number =
-  typeof performance !== "undefined" && typeof performance.now === "function"
-    ? () => performance.now()
-    : () => Date.now();
 
 /** Tracks a single in-flight loader call so concurrent misses can coalesce and
  * so a settle can verify it still "owns" the key (race-safety via identity). */

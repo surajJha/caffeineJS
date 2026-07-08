@@ -47,6 +47,8 @@
     "coverage": "vitest run --coverage",
     "bench": "tsx bench/run.ts",
     "bench:adaptive": "tsx bench/adaptive.ts",
+    "bench:throughput": "node --expose-gc --import tsx bench/throughput.ts",
+    "bench:hitratio": "tsx bench/hit-ratio.ts",
     "clean": "rm -rf dist"
   },
   "devDependencies": {

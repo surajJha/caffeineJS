@@ -41,6 +41,7 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "bench": "tsx bench/run.ts",
+    "bench:adaptive": "tsx bench/adaptive.ts",
     "clean": "rm -rf dist"
   },
   "devDependencies": {

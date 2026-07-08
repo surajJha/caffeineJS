@@ -20,16 +20,34 @@ const PROTECTED = 2;
 /** Capacity of the deferred read buffer (power of two). */
 const READ_BUFFER_SIZE = 64;
 
+// --- Hill-climbing constants (Caffeine's adaptive scheme) ---
+/** Step size as a fraction of capacity when restarting the climb. */
+const HILL_STEP_PERCENT = 0.0625;
+/** Multiplicative decay applied to the step as it converges. */
+const HILL_STEP_DECAY = 0.9;
+/** Hit-rate swing that triggers a full-size restart of the climb. */
+const HILL_RESTART_THRESHOLD = 0.05;
+
 export class WindowTinyLfu<K, V> {
   private readonly store: SoaStore<K, V>;
   private readonly sketch: FrequencySketch;
 
-  private readonly windowMax: number;
-  private readonly protectedMax: number;
+  /** Mutable segment maxima — adjusted by the adaptive climber. */
+  private windowMax: number;
+  private protectedMax: number;
 
   private windowSize = 0;
   private probationSize = 0;
   private protectedSize = 0;
+
+  // --- Adaptive window sizing (CAFF-041) ---
+  private readonly adaptive: boolean;
+  private readonly sampleSize: number;
+  private hitsInSample = 0;
+  private missesInSample = 0;
+  private previousHitRate = 0;
+  private stepSize: number;
+  private warmedUp = false;
 
   /**
    * Deferred read buffer (CAFF-017). Cache hits append the accessed slot index
@@ -42,7 +60,7 @@ export class WindowTinyLfu<K, V> {
   private readonly readBuffer: Int32Array;
   private readBufferLen = 0;
 
-  constructor(store: SoaStore<K, V>, doorkeeper = true) {
+  constructor(store: SoaStore<K, V>, doorkeeper = true, adaptive = true) {
     this.store = store;
     this.sketch = new FrequencySketch(store.capacity, doorkeeper);
     this.readBuffer = new Int32Array(READ_BUFFER_SIZE);
@@ -51,6 +69,18 @@ export class WindowTinyLfu<K, V> {
     this.windowMax = Math.max(1, Math.floor(capacity * 0.01));
     const mainMax = capacity - this.windowMax;
     this.protectedMax = Math.max(0, Math.floor(mainMax * 0.8));
+
+    this.adaptive = adaptive;
+    // Re-evaluate the window ratio once per ~10× capacity accesses.
+    this.sampleSize = Math.max(10, capacity * 10);
+    // Start at zero so the first sample only calibrates the baseline hit rate
+    // (no window jerk while previousHitRate is still 0); the climb ramps after.
+    this.stepSize = 0;
+  }
+
+  /** Current admission-window maximum (exposed for tests/observability). */
+  get windowMaximum(): number {
+    return this.windowMax;
   }
 
   /** Records a frequency observation for the key at `idx`. */
@@ -130,6 +160,96 @@ export class WindowTinyLfu<K, V> {
     this.probationSize = 0;
     this.protectedSize = 0;
     this.readBufferLen = 0;
+    this.hitsInSample = 0;
+    this.missesInSample = 0;
+    this.previousHitRate = 0;
+    this.warmedUp = false;
+  }
+
+  /**
+   * Records one access outcome for the adaptive climber (CAFF-041). Called once
+   * per `get` by the cache — before read-buffer coalescing — so the hit-rate
+   * sample is exact. Every `sampleSize` accesses the window/main ratio is
+   * re-tuned by one hill-climbing step toward the better-performing direction.
+   */
+  recordSample(hit: boolean): void {
+    if (!this.adaptive) return;
+    if (hit) this.hitsInSample++;
+    else this.missesInSample++;
+    if (this.hitsInSample + this.missesInSample >= this.sampleSize) {
+      this.climb();
+    }
+  }
+
+  private climb(): void {
+    const requests = this.hitsInSample + this.missesInSample;
+    const hitRate = this.hitsInSample / requests;
+    this.hitsInSample = 0;
+    this.missesInSample = 0;
+
+    if (!this.warmedUp) {
+      // First sample only calibrates the baseline. Acting now would use a bogus
+      // delta (previousHitRate is still 0), jerking the window on every cache.
+      this.warmedUp = true;
+      this.previousHitRate = hitRate;
+      this.stepSize = HILL_STEP_PERCENT * this.store.capacity;
+      return;
+    }
+
+    const delta = hitRate - this.previousHitRate;
+    this.previousHitRate = hitRate;
+
+    // Continue in the current direction if the last move helped, else reverse.
+    const amount = delta >= 0 ? this.stepSize : -this.stepSize;
+    // A large swing means we're far from the optimum → restart at full step.
+    this.stepSize =
+      Math.abs(delta) >= HILL_RESTART_THRESHOLD
+        ? HILL_STEP_PERCENT * this.store.capacity * (amount >= 0 ? 1 : -1)
+        : HILL_STEP_DECAY * amount;
+
+    const step = Math.trunc(amount);
+    if (step !== 0) {
+      // Reflect recent reads in the LRU order before choosing what to move.
+      this.drainRead();
+      this.resizeWindow(step);
+    }
+  }
+
+  /**
+   * Shifts capacity between the admission window and the main region by `delta`
+   * entries (positive grows the window, negative shrinks it), then rebalances
+   * segment occupancy back within the new maxima. Total capacity is unchanged,
+   * so no evictions occur here — overflow is absorbed by probation.
+   */
+  private resizeWindow(delta: number): void {
+    const capacity = this.store.capacity;
+    const newWindowMax = Math.min(capacity - 1, Math.max(1, this.windowMax + delta));
+    const applied = newWindowMax - this.windowMax;
+    if (applied === 0) return;
+    this.windowMax = newWindowMax;
+    this.protectedMax = Math.max(0, this.protectedMax - applied);
+
+    const s = this.store;
+    // Shrinking the window: demote its LRU tail into probation (as candidates).
+    while (this.windowSize > this.windowMax) {
+      const victim = s.back(s.WINDOW_HEAD);
+      if (victim === NIL) break;
+      s.unlink(victim);
+      this.windowSize--;
+      s.pushFront(s.PROBATION_HEAD, victim);
+      s.segment[victim] = PROBATION;
+      this.probationSize++;
+    }
+    // Shrinking protected: demote its LRU tail into probation.
+    while (this.protectedSize > this.protectedMax) {
+      const victim = s.back(s.PROTECTED_HEAD);
+      if (victim === NIL) break;
+      s.unlink(victim);
+      this.protectedSize--;
+      s.pushFront(s.PROBATION_HEAD, victim);
+      s.segment[victim] = PROBATION;
+      this.probationSize++;
+    }
   }
 
   private decSegment(seg: number): void {

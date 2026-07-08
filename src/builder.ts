@@ -27,6 +27,12 @@ export class CacheBuilder<K, V> {
     return this;
   }
 
+  /** Enable/disable adaptive hill-climbing window sizing (default on). */
+  adaptive(enabled = true): this {
+    this.options.adaptive = enabled;
+    return this;
+  }
+
   removalListener(listener: RemovalListener<K, V>): this {
     this.options.removalListener = listener;
     return this;

@@ -25,6 +25,12 @@ export interface CacheOptions<K, V> {
   maximumSize: number;
   /** Enable the doorkeeper bloom filter (default true). */
   doorkeeper?: boolean;
+  /**
+   * Auto-tune the admission-window / main-region ratio via hill-climbing to
+   * maximize hit rate on the live workload (default true). Disable for a fixed
+   * ~1% window and fully deterministic behavior.
+   */
+  adaptive?: boolean;
   /** Track hit/miss/eviction statistics (default false, ~zero overhead). */
   recordStats?: boolean;
   /** Invoked after an entry is removed, evicted, or replaced. */

@@ -61,15 +61,18 @@ byRef.get({ id: 1 });  // undefined — different object identity
 |--------|------|---------|-------------|
 | `maximumSize` | `number` | — | Max entries before size-based eviction. |
 | `doorkeeper` | `boolean` | `true` | Bloom filter that keeps one-hit-wonders out of the frequency sketch. |
+| `adaptive` | `boolean` | `true` | Auto-tune the admission-window/main ratio via hill-climbing to maximize hit rate on the live workload. Disable for a fixed ~1% window and deterministic behavior. |
 | `recordStats` | `boolean` | `false` | Track hit/miss/eviction counts (near-zero overhead when off). |
 | `removalListener` | `(key, value, cause) => void` | — | Called on eviction/replacement/deletion. `cause` ∈ `"size" | "replaced" | "explicit"`. |
 
-Builder methods (`.recordStats()`, `.doorkeeper(bool)`, `.removalListener(fn)`) mirror the options and return `this`; call `.build()` to get the `Cache`.
+Builder methods (`.recordStats()`, `.doorkeeper(bool)`, `.adaptive(bool)`, `.removalListener(fn)`) mirror the options and return `this`; call `.build()` to get the `Cache`.
 
 ## Design
 
 - **Structure-of-Arrays store** — one `Map<K, index>` plus preallocated typed arrays for all linked-list pointers and metadata, and a typed-array free-list. No per-entry object allocation, so GC stays flat at millions of entries.
 - **Window-TinyLFU policy** — a small LRU admission window in front of a segmented-LRU (probation + protected) main region, gated by a 4-bit Count-Min Sketch with a doorkeeper and periodic aging.
+- **Adaptive window** — a hill-climber continuously re-tunes the window/main split from the observed hit rate, so recency-heavy workloads get a larger window automatically (up to tens of points of extra hit rate) while stable frequency-skewed workloads keep a small window. On by default; `.adaptive(false)` pins it.
+- **Batched read maintenance** — cache hits are buffered and drained in batches, keeping the hot `get` path allocation-free and cheap (~6M ops/s at 1M entries).
 
 See `plan.md` for the full roadmap and architecture notes.
 

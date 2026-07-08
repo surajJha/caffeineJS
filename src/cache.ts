@@ -27,9 +27,14 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
   private readonly evictSink: (victim: number) => void;
 
   constructor(options: CacheOptions<K, V>) {
-    const { maximumSize, doorkeeper = true, recordStats = false } = options;
+    const {
+      maximumSize,
+      doorkeeper = true,
+      adaptive = true,
+      recordStats = false,
+    } = options;
     this.store = new SoaStore<K, V>(maximumSize);
-    this.policy = new WindowTinyLfu<K, V>(this.store, doorkeeper);
+    this.policy = new WindowTinyLfu<K, V>(this.store, doorkeeper, adaptive);
     this.listener = options.removalListener;
     this.statsEnabled = recordStats;
 
@@ -54,9 +59,11 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
     const idx = this.store.indexOf(key);
     if (idx === NIL) {
       if (this.statsEnabled) this.misses++;
+      this.policy.recordSample(false);
       return undefined;
     }
     this.policy.onAccessBuffered(idx);
+    this.policy.recordSample(true);
     if (this.statsEnabled) this.hits++;
     return this.store.valueAt(idx);
   }

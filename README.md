@@ -2,7 +2,7 @@
 
 > High-performance, isomorphic in-memory cache for JavaScript & TypeScript, built on the **Window-TinyLFU** admission policy. Higher hit ratios than LRU/LFU. Zero runtime dependencies. Runs in Node, browsers, Deno, Bun, and edge runtimes.
 
-**Status: early development (v0).** The core cache, W-TinyLFU policy, and Structure-of-Arrays store are implemented and tested. TTL, weights, async loading, and observability are on the roadmap (see `plan.md`).
+**Status: early development (v0).** The core cache, W-TinyLFU policy, Structure-of-Arrays store, TTL, weighted/byte bounding, async loading, and cross-runtime env shims are implemented and tested. Multi-runtime CI, a React adapter, and observability tooling are on the roadmap (see `plan.md`).
 
 ## Why
 
@@ -119,8 +119,49 @@ See `plan.md` for the full roadmap and architecture notes.
 ## Benchmark
 
 ```sh
-node --expose-gc --import tsx bench/run.ts
+npm run bench            # perf gate (throughput + hit rate vs lru-cache)
+npm run bench:throughput # ops/sec by key type (int/string/object) + weight-bound
+npm run bench:hitratio   # hit ratio vs LRU/LFU/FIFO on skew/scan/one-hit traces
 ```
+
+## Browser
+
+The package is ESM-first and dependency-free, so it works directly via a bundler
+(Vite/webpack/esbuild) or from a CDN:
+
+```html
+<script type="module">
+  import { caffeine } from "https://esm.sh/caffeine-js";
+  const cache = caffeine({ maximumSize: 1000 }).build();
+  cache.set("k", 42);
+  console.log(cache.get("k")); // 42
+</script>
+```
+
+## Comparison
+
+| Library         | Policy          | Scan-resistant | Frequency-aware | TTL | Weights | Async loader | Isomorphic |
+| --------------- | --------------- | -------------- | --------------- | --- | ------- | ------------ | ---------- |
+| **caffeine-js** | **W-TinyLFU**   | ✅              | ✅               | ✅   | ✅       | ✅            | ✅          |
+| `lru-cache`     | LRU             | ❌              | ❌               | ✅   | ✅       | ✅ (fetch)    | ✅          |
+| `quick-lru`     | LRU (2-segment) | partial        | ❌               | ✅   | ❌       | ❌            | ✅          |
+
+See [docs/why-w-tinylfu.md](docs/why-w-tinylfu.md) for a full explainer of the policy.
+
+## Examples
+
+Runnable snippets in [`examples/`](examples/):
+
+- [`basic.ts`](examples/basic.ts) — bounded cache, stats, removal listener
+- [`ttl.ts`](examples/ttl.ts) — TTL expiry with an injectable clock
+- [`async-loader.ts`](examples/async-loader.ts) — async loading cache + request coalescing
+- [`byte-bounded.ts`](examples/byte-bounded.ts) — approximate byte-capacity bounding
+
+```sh
+npx tsx examples/basic.ts
+```
+
+Generate the API reference with `npm run docs:api` (typedoc → `docs/api`).
 
 ## License
 

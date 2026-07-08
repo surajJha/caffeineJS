@@ -49,6 +49,7 @@
     "bench:adaptive": "tsx bench/adaptive.ts",
     "bench:throughput": "node --expose-gc --import tsx bench/throughput.ts",
     "bench:hitratio": "tsx bench/hit-ratio.ts",
+    "docs:api": "typedoc",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
@@ -58,6 +59,7 @@
     "lru-cache": "^11.5.2",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
+    "typedoc": "^0.27.6",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

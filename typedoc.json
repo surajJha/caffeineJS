@@ -1,0 +1,12 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts", "src/estimate.ts"],
+  "out": "docs/api",
+  "readme": "README.md",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "categorizeByGroup": true,
+  "navigationLinks": {
+    "Why W-TinyLFU": "https://github.com/your-org/caffeine-js/blob/main/docs/why-w-tinylfu.md"
+  }
+}

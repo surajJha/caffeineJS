@@ -7,21 +7,24 @@ const PROBATION = 1;
 const PROTECTED = 2;
 
 /**
- * Window-TinyLFU eviction policy.
+ * Window-TinyLFU eviction policy, bounded by **weight**.
  *
- * Layout: a small LRU admission window (~1% of capacity) in front of a
+ * Layout: a small LRU admission window (~1% of the weight bound) in front of a
  * segmented-LRU main region split into probation and protected (~80% of main).
  * New entries enter the window. When the window overflows, its LRU victim is
  * demoted to probation as an admission *candidate*; when the whole cache is
- * over capacity, the candidate's estimated frequency is compared against the
- * probation LRU *victim* and the loser is evicted. This is what lets the cache
- * keep frequently-used items that a plain LRU would drop.
+ * over its weight bound, the candidate's estimated frequency is compared
+ * against the probation LRU *victim* and the loser is evicted. This is what
+ * lets the cache keep frequently-used items that a plain LRU would drop.
+ *
+ * A count-bounded cache is the special case where every entry has weight 1, so
+ * weighted size equals entry count and the bound equals the maximum size.
  */
 /** Capacity of the deferred read buffer (power of two). */
 const READ_BUFFER_SIZE = 64;
 
 // --- Hill-climbing constants (Caffeine's adaptive scheme) ---
-/** Step size as a fraction of capacity when restarting the climb. */
+/** Step size as a fraction of the weight bound when restarting the climb. */
 const HILL_STEP_PERCENT = 0.0625;
 /** Multiplicative decay applied to the step as it converges. */
 const HILL_STEP_DECAY = 0.9;
@@ -32,13 +35,18 @@ export class WindowTinyLfu<K, V> {
   private readonly store: SoaStore<K, V>;
   private readonly sketch: FrequencySketch;
 
-  /** Mutable segment maxima — adjusted by the adaptive climber. */
+  /** The total weight bound (entry count for count-bounded caches). */
+  private readonly maximumWeight: number;
+
+  /** Mutable segment maxima (weight units) — adjusted by the adaptive climber. */
   private windowMax: number;
   private protectedMax: number;
 
-  private windowSize = 0;
-  private probationSize = 0;
-  private protectedSize = 0;
+  private windowWeight = 0;
+  private probationWeight = 0;
+  private protectedWeight = 0;
+  /** Running total across all three segments. */
+  private weightedSize = 0;
 
   // --- Adaptive window sizing (CAFF-041) ---
   private readonly adaptive: boolean;
@@ -60,19 +68,27 @@ export class WindowTinyLfu<K, V> {
   private readonly readBuffer: Int32Array;
   private readBufferLen = 0;
 
-  constructor(store: SoaStore<K, V>, doorkeeper = true, adaptive = true) {
+  constructor(
+    store: SoaStore<K, V>,
+    doorkeeper = true,
+    adaptive = true,
+    maximumWeight?: number,
+    expectedEntries?: number,
+  ) {
     this.store = store;
-    this.sketch = new FrequencySketch(store.capacity, doorkeeper);
+    const bound = maximumWeight ?? store.capacity;
+    this.maximumWeight = bound;
+    const sketchEntries = expectedEntries ?? store.capacity;
+    this.sketch = new FrequencySketch(sketchEntries, doorkeeper);
     this.readBuffer = new Int32Array(READ_BUFFER_SIZE);
 
-    const capacity = store.capacity;
-    this.windowMax = Math.max(1, Math.floor(capacity * 0.01));
-    const mainMax = capacity - this.windowMax;
+    this.windowMax = Math.max(1, Math.floor(bound * 0.01));
+    const mainMax = bound - this.windowMax;
     this.protectedMax = Math.max(0, Math.floor(mainMax * 0.8));
 
     this.adaptive = adaptive;
-    // Re-evaluate the window ratio once per ~10× capacity accesses.
-    this.sampleSize = Math.max(10, capacity * 10);
+    // Re-evaluate the window ratio once per ~10× expected-entries accesses.
+    this.sampleSize = Math.max(10, sketchEntries * 10);
     // Start at zero so the first sample only calibrates the baseline hit rate
     // (no window jerk while previousHitRate is still 0); the climb ramps after.
     this.stepSize = 0;
@@ -83,27 +99,37 @@ export class WindowTinyLfu<K, V> {
     return this.windowMax;
   }
 
-  /** Records a frequency observation for the key at `idx`. */
+  /** Records a frequency observation for a key hash. */
   recordAccessHash(hash: number): void {
     this.sketch.increment(hash);
   }
 
   /** Called after a brand-new slot has been allocated with its key/value. */
   onAdd(idx: number, sink: (victim: number) => void): void {
+    const w = this.store.weightAt(idx);
     this.sketch.increment(this.store.hashAt(idx));
     this.store.pushFront(this.store.WINDOW_HEAD, idx);
     this.store.segment[idx] = WINDOW;
-    this.windowSize++;
+    this.windowWeight += w;
+    this.weightedSize += w;
     this.evict(sink);
   }
 
   /**
-   * Fast-path cache hit: record the access for deferred processing. The actual
-   * sketch increment and LRU reorder happen at the next drain. Consecutive hits
-   * on the same slot are coalesced (the buffer holds each hot index at most
-   * once in a row), which collapses repeated reads of a hot key to a single
-   * bookkeeping step.
+   * Adjusts bookkeeping when an existing entry's weight changes on overwrite,
+   * then evicts if the new weight pushed the cache over its bound.
    */
+  onReplaceWeight(idx: number, oldW: number, newW: number, sink: (victim: number) => void): void {
+    const delta = newW - oldW;
+    if (delta === 0) return;
+    const seg = this.store.segment[idx];
+    if (seg === WINDOW) this.windowWeight += delta;
+    else if (seg === PROBATION) this.probationWeight += delta;
+    else this.protectedWeight += delta;
+    this.weightedSize += delta;
+    if (delta > 0) this.evict(sink);
+  }
+
   onAccessBuffered(idx: number): void {
     const len = this.readBufferLen;
     if (len > 0 && this.readBuffer[len - 1] === idx) return; // coalesce repeats
@@ -151,14 +177,17 @@ export class WindowTinyLfu<K, V> {
 
   /** Called when a live slot is explicitly removed (delete/replace). */
   onRemove(idx: number): void {
+    const w = this.store.weightAt(idx);
     this.store.unlink(idx);
-    this.decSegment(this.store.segment[idx] as number);
+    this.decSegment(this.store.segment[idx] as number, w);
+    this.weightedSize -= w;
   }
 
   reset(): void {
-    this.windowSize = 0;
-    this.probationSize = 0;
-    this.protectedSize = 0;
+    this.windowWeight = 0;
+    this.probationWeight = 0;
+    this.protectedWeight = 0;
+    this.weightedSize = 0;
     this.readBufferLen = 0;
     this.hitsInSample = 0;
     this.missesInSample = 0;
@@ -166,12 +195,6 @@ export class WindowTinyLfu<K, V> {
     this.warmedUp = false;
   }
 
-  /**
-   * Records one access outcome for the adaptive climber (CAFF-041). Called once
-   * per `get` by the cache — before read-buffer coalescing — so the hit-rate
-   * sample is exact. Every `sampleSize` accesses the window/main ratio is
-   * re-tuned by one hill-climbing step toward the better-performing direction.
-   */
   recordSample(hit: boolean): void {
     if (!this.adaptive) return;
     if (hit) this.hitsInSample++;
@@ -188,151 +211,146 @@ export class WindowTinyLfu<K, V> {
     this.missesInSample = 0;
 
     if (!this.warmedUp) {
-      // First sample only calibrates the baseline. Acting now would use a bogus
-      // delta (previousHitRate is still 0), jerking the window on every cache.
       this.warmedUp = true;
       this.previousHitRate = hitRate;
-      this.stepSize = HILL_STEP_PERCENT * this.store.capacity;
+      this.stepSize = HILL_STEP_PERCENT * this.maximumWeight;
       return;
     }
 
     const delta = hitRate - this.previousHitRate;
     this.previousHitRate = hitRate;
 
-    // Continue in the current direction if the last move helped, else reverse.
     const amount = delta >= 0 ? this.stepSize : -this.stepSize;
-    // A large swing means we're far from the optimum → restart at full step.
     this.stepSize =
       Math.abs(delta) >= HILL_RESTART_THRESHOLD
-        ? HILL_STEP_PERCENT * this.store.capacity * (amount >= 0 ? 1 : -1)
+        ? HILL_STEP_PERCENT * this.maximumWeight * (amount >= 0 ? 1 : -1)
         : HILL_STEP_DECAY * amount;
 
     const step = Math.trunc(amount);
     if (step !== 0) {
-      // Reflect recent reads in the LRU order before choosing what to move.
       this.drainRead();
       this.resizeWindow(step);
     }
   }
 
   /**
-   * Shifts capacity between the admission window and the main region by `delta`
-   * entries (positive grows the window, negative shrinks it), then rebalances
-   * segment occupancy back within the new maxima. Total capacity is unchanged,
-   * so no evictions occur here — overflow is absorbed by probation.
+   * Shifts weight capacity between the admission window and the main region by
+   * `delta` (positive grows the window), then rebalances segment occupancy back
+   * within the new maxima. Total bound is unchanged, so no evictions occur here
+   * — overflow is absorbed by probation.
    */
   private resizeWindow(delta: number): void {
-    const capacity = this.store.capacity;
-    const newWindowMax = Math.min(capacity - 1, Math.max(1, this.windowMax + delta));
+    const bound = this.maximumWeight;
+    const newWindowMax = Math.min(bound - 1, Math.max(1, this.windowMax + delta));
     const applied = newWindowMax - this.windowMax;
     if (applied === 0) return;
     this.windowMax = newWindowMax;
     this.protectedMax = Math.max(0, this.protectedMax - applied);
 
     const s = this.store;
-    // Shrinking the window: demote its LRU tail into probation (as candidates).
-    while (this.windowSize > this.windowMax) {
+    while (this.windowWeight > this.windowMax) {
       const victim = s.back(s.WINDOW_HEAD);
       if (victim === NIL) break;
+      const w = s.weightAt(victim);
       s.unlink(victim);
-      this.windowSize--;
+      this.windowWeight -= w;
       s.pushFront(s.PROBATION_HEAD, victim);
       s.segment[victim] = PROBATION;
-      this.probationSize++;
+      this.probationWeight += w;
     }
-    // Shrinking protected: demote its LRU tail into probation.
-    while (this.protectedSize > this.protectedMax) {
+    while (this.protectedWeight > this.protectedMax) {
       const victim = s.back(s.PROTECTED_HEAD);
       if (victim === NIL) break;
+      const w = s.weightAt(victim);
       s.unlink(victim);
-      this.protectedSize--;
+      this.protectedWeight -= w;
       s.pushFront(s.PROBATION_HEAD, victim);
       s.segment[victim] = PROBATION;
-      this.probationSize++;
+      this.probationWeight += w;
     }
   }
 
-  private decSegment(seg: number): void {
-    if (seg === WINDOW) this.windowSize--;
-    else if (seg === PROBATION) this.probationSize--;
-    else this.protectedSize--;
+  private decSegment(seg: number, w: number): void {
+    if (seg === WINDOW) this.windowWeight -= w;
+    else if (seg === PROBATION) this.probationWeight -= w;
+    else this.protectedWeight -= w;
   }
 
   private promoteToProtected(idx: number): void {
     const s = this.store;
+    const w = s.weightAt(idx);
     s.unlink(idx);
-    this.probationSize--;
-    if (this.protectedSize >= this.protectedMax) {
-      // Demote protected LRU back to probation to make room.
+    this.probationWeight -= w;
+    // Make room in protected for this entry's weight.
+    while (this.protectedWeight + w > this.protectedMax) {
       const demote = s.back(s.PROTECTED_HEAD);
-      if (demote !== NIL) {
-        s.unlink(demote);
-        this.protectedSize--;
-        s.pushFront(s.PROBATION_HEAD, demote);
-        s.segment[demote] = PROBATION;
-        this.probationSize++;
-      }
+      if (demote === NIL) break;
+      const dw = s.weightAt(demote);
+      s.unlink(demote);
+      this.protectedWeight -= dw;
+      s.pushFront(s.PROBATION_HEAD, demote);
+      s.segment[demote] = PROBATION;
+      this.probationWeight += dw;
     }
     s.pushFront(s.PROTECTED_HEAD, idx);
     s.segment[idx] = PROTECTED;
-    this.protectedSize++;
+    this.protectedWeight += w;
   }
 
   private evict(sink: (victim: number) => void): void {
     const s = this.store;
 
     // 1. Drain the admission window into probation (as candidates).
-    while (this.windowSize > this.windowMax) {
+    while (this.windowWeight > this.windowMax) {
       const victim = s.back(s.WINDOW_HEAD);
       if (victim === NIL) break;
+      const w = s.weightAt(victim);
       s.unlink(victim);
-      this.windowSize--;
+      this.windowWeight -= w;
       s.pushFront(s.PROBATION_HEAD, victim);
       s.segment[victim] = PROBATION;
-      this.probationSize++;
+      this.probationWeight += w;
     }
 
-    // 2. While over capacity, admit-or-reject from the main region.
-    while (s.size > s.capacity) {
-      this.evictFromMain(sink);
+    // 2. While over the weight bound, admit-or-reject from the main region.
+    while (this.weightedSize > this.maximumWeight) {
+      if (!this.evictFromMain(sink)) break;
     }
   }
 
-  private evictFromMain(sink: (victim: number) => void): void {
+  private evictFromMain(sink: (victim: number) => void): boolean {
     const s = this.store;
 
-    // Prefer evicting from probation; fall back to protected, then window.
-    if (this.probationSize > 0) {
+    if (this.probationWeight > 0) {
       const candidate = s.front(s.PROBATION_HEAD); // MRU: most recent demotion
       const victim = s.back(s.PROBATION_HEAD); // LRU: eviction candidate
 
       if (candidate === victim || candidate === NIL) {
-        this.evictSlot(victim, PROBATION, sink);
-        return;
+        return this.evictSlot(victim, PROBATION, sink);
       }
 
       const freqC = this.sketch.frequency(s.hashAt(candidate));
       const freqV = this.sketch.frequency(s.hashAt(victim));
       if (freqC > freqV) {
-        this.evictSlot(victim, PROBATION, sink); // admit candidate
-      } else {
-        this.evictSlot(candidate, PROBATION, sink); // reject candidate
+        return this.evictSlot(victim, PROBATION, sink); // admit candidate
       }
-      return;
+      return this.evictSlot(candidate, PROBATION, sink); // reject candidate
     }
 
-    if (this.protectedSize > 0) {
-      this.evictSlot(s.back(s.PROTECTED_HEAD), PROTECTED, sink);
-      return;
+    if (this.protectedWeight > 0) {
+      return this.evictSlot(s.back(s.PROTECTED_HEAD), PROTECTED, sink);
     }
 
-    this.evictSlot(s.back(s.WINDOW_HEAD), WINDOW, sink);
+    return this.evictSlot(s.back(s.WINDOW_HEAD), WINDOW, sink);
   }
 
-  private evictSlot(idx: number, seg: number, sink: (victim: number) => void): void {
-    if (idx === NIL) return;
+  private evictSlot(idx: number, seg: number, sink: (victim: number) => void): boolean {
+    if (idx === NIL) return false;
+    const w = this.store.weightAt(idx);
     this.store.unlink(idx);
-    this.decSegment(seg);
+    this.decSegment(seg, w);
+    this.weightedSize -= w;
     sink(idx);
+    return true;
   }
 }

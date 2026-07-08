@@ -20,6 +20,8 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
   private readonly listener?: RemovalListener<K, V>;
   private readonly statsEnabled: boolean;
   private readonly expiry?: ExpiryPolicy;
+  private readonly weigher?: (key: K, value: V) => number;
+  private readonly maxBound: number;
 
   private hits = 0;
   private misses = 0;
@@ -39,6 +41,9 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
   constructor(options: CacheOptions<K, V>) {
     const {
       maximumSize,
+      maximumWeight,
+      weigher,
+      expectedEntries,
       doorkeeper = true,
       adaptive = true,
       recordStats = false,
@@ -46,15 +51,54 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
       expireAfterAccess,
       clock = Date.now,
     } = options;
-    this.store = new SoaStore<K, V>(maximumSize);
-    this.policy = new WindowTinyLfu<K, V>(this.store, doorkeeper, adaptive);
+
+    const weighted = maximumWeight !== undefined;
+    if (weighted === (maximumSize !== undefined)) {
+      throw new Error(
+        "specify exactly one of maximumSize or maximumWeight",
+      );
+    }
+    if (weighted && typeof weigher !== "function") {
+      throw new Error("maximumWeight requires a weigher function");
+    }
+    const w0 = normalizeTtl(expireAfterWrite, "expireAfterWrite");
+    const a0 = normalizeTtl(expireAfterAccess, "expireAfterAccess");
+    if (weighted && (w0 > 0 || a0 > 0)) {
+      throw new Error(
+        "TTL (expireAfterWrite/Access) is not supported with maximumWeight in v1",
+      );
+    }
+
+    if (weighted) {
+      const expected = Math.max(1, Math.floor(expectedEntries ?? 1024));
+      this.store = new SoaStore<K, V>(expected, true);
+      this.policy = new WindowTinyLfu<K, V>(
+        this.store,
+        doorkeeper,
+        adaptive,
+        maximumWeight,
+        expected,
+      );
+      this.maxBound = maximumWeight!;
+      this.weigher = weigher;
+    } else {
+      const size = maximumSize!;
+      this.store = new SoaStore<K, V>(size + 1, false);
+      this.policy = new WindowTinyLfu<K, V>(
+        this.store,
+        doorkeeper,
+        adaptive,
+        size,
+        size,
+      );
+      this.maxBound = size;
+    }
+
     this.listener = options.removalListener;
     this.statsEnabled = recordStats;
 
-    const w = normalizeTtl(expireAfterWrite, "expireAfterWrite");
-    const a = normalizeTtl(expireAfterAccess, "expireAfterAccess");
-    if (w > 0 || a > 0) {
-      this.expiry = new ExpiryPolicy(maximumSize + 1, w, a, clock);
+    if (w0 > 0 || a0 > 0) {
+      this.expiry = new ExpiryPolicy(this.store.slotSpace, w0, a0, clock);
     }
 
     this.evictSink = (victim: number) => {
@@ -68,7 +112,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
   }
 
   get capacity(): number {
-    return this.store.capacity;
+    return this.maxBound;
   }
 
   get size(): number {
@@ -121,16 +165,23 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
     const existing = this.store.indexOf(key);
     if (existing !== NIL) {
       const old = this.store.valueAt(existing);
+      const oldW = this.store.weightAt(existing);
       this.store.setValueAt(existing, value);
+      const newW = this.weigher ? weight(this.weigher(key, value)) : 1;
+      if (newW !== oldW) this.store.setWeightAt(existing, newW);
       this.policy.onAccess(existing);
+      if (newW !== oldW) {
+        this.policy.onReplaceWeight(existing, oldW, newW, this.evictSink);
+      }
       if (this.expiry) this.expiry.onWrite(existing, now, false);
       if (this.listener && old !== value) this.enqueue(key, old, "replaced");
       this.deliverRemovals();
       return;
     }
-    const idx = this.store.alloc(key, value, hashKey(key), 1);
-    // alloc only fails if physical slots are exhausted, which cannot happen:
-    // we hold capacity+1 slots and evict back to capacity on every add.
+    const w = this.weigher ? weight(this.weigher(key, value)) : 1;
+    const idx = this.store.alloc(key, value, hashKey(key), w);
+    // alloc only fails if physical slots are exhausted; the store grows for
+    // weight-bounded caches and count-bounded caches hold a +1 overshoot slot.
     if (this.expiry) this.expiry.onWrite(idx, now, true);
     this.policy.onAdd(idx, this.evictSink);
     this.deliverRemovals();
@@ -315,4 +366,12 @@ function normalizeTtl(value: number | undefined, name: string): number {
     throw new Error(`${name} must be a positive number of milliseconds`);
   }
   return value;
+}
+
+/** Coerces a weigher result to a non-negative finite number. */
+function weight(w: number): number {
+  if (!Number.isFinite(w) || w < 0) {
+    throw new Error("weigher must return a non-negative finite number");
+  }
+  return w;
 }

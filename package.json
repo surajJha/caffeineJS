@@ -24,6 +24,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./estimate": {
+      "types": "./dist/estimate.d.ts",
+      "import": "./dist/estimate.mjs",
+      "require": "./dist/estimate.cjs"
     }
   },
   "main": "./dist/index.cjs",

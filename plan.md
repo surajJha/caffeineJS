@@ -220,7 +220,21 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 
 ### M2 — Capabilities
 
-#### CAFF-020 TTL: expire-after-write & expire-after-access
+> **M2 status (shipped):** TTL (CAFF-020), weighted entries (CAFF-022),
+> byte estimator (CAFF-027), extended stats (CAFF-023), hardened removal
+> listeners (CAFF-024), async loading cache (CAFF-025), and utility methods
+> (CAFF-026) are all implemented and tested (57 tests, perf gate 5.88M/s hot-get
+> preserved). The core was unified onto a **weight-bounded** policy where a
+> count-bounded cache is the special case of every entry having weight 1, and
+> the SoA store became **growable** (sentinels relocated to fixed low indices)
+> for weight/byte-bounded caches.
+>
+> **v1 boundaries / deferred:** CAFF-021 variable per-entry expiry deferred;
+> TTL is not combined with `maximumWeight` in v1 (throws — growable expiry
+> arrays deferred); `asMap()` returns a snapshot rather than a live proxy view;
+> negative caching for async failures deferred (CAFF-028 decision log).
+
+#### CAFF-020 TTL: expire-after-write & expire-after-access — ✅ DONE
 - **Type**: Feature | **Priority**: P1 | **Size**: L | **Depends On**: CAFF-014
 - **Files**: `src/policy/expiry.ts`, `src/cache.ts`, `test/expiry.test.ts`
 - **Acceptance Criteria**:
@@ -239,7 +253,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Falls back to a hierarchical timer wheel for O(1) scheduling.
 - **Implementation Notes**: Optional; mirrors Caffeine `Expiry`. Keep behind capability flag.
 
-#### CAFF-022 Weighted entries (`maximumWeight` + `Weigher`)
+#### CAFF-022 Weighted entries (`maximumWeight` + `Weigher`) — ✅ DONE
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-014
 - **Files**: `src/cache.ts`, `src/builder.ts`, `test/weight.test.ts`
 - **Acceptance Criteria**:
@@ -248,7 +262,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Weight recomputed on value update.
 - **Implementation Notes**: `maximumSize` and `maximumWeight` are mutually exclusive (validate in builder).
 
-#### CAFF-027 Byte-based bounding & memory estimator
+#### CAFF-027 Byte-based bounding & memory estimator — ✅ DONE
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-022
 - **Files**: `src/util/estimate-bytes.ts`, `src/builder.ts`, `test/estimate-bytes.test.ts`
 - **Acceptance Criteria**:
@@ -266,7 +280,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Accepted items get tickets; deferred items are recorded in "OUT of scope (v1)".
 - **Implementation Notes**: Prevents silent scope creep and surfaces decisions the review flagged as undecided. Cheap now, expensive later.
 
-#### CAFF-023 Statistics & metrics
+#### CAFF-023 Statistics & metrics — ✅ DONE
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-014
 - **Files**: `src/stats.ts`, `test/stats.test.ts`
 - **Acceptance Criteria**:
@@ -274,7 +288,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Counters are cheap (plain numbers); disabled path has ~zero overhead.
 - **Implementation Notes**: Provide a `StatsCounter` interface with `Disabled` (no-op) and `Concurrent`/`Counting` impls.
 
-#### CAFF-024 Removal & eviction listeners
+#### CAFF-024 Removal & eviction listeners — ✅ DONE
 - **Type**: Feature | **Priority**: P1 | **Size**: S | **Depends On**: CAFF-014
 - **Files**: `src/cache.ts`, `test/listeners.test.ts`
 - **Acceptance Criteria**:
@@ -282,7 +296,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Delivery is **strictly post-commit**: state mutated fully → records enqueued → callbacks drained after invariants restored; recursive drains guarded; listener errors isolated.
 - **Implementation Notes**: `RemovalCause` enum-like union type. Never invoke callbacks mid-mutation (re-entrancy hazard — a listener may call `set`/`delete`/`clear`).
 
-#### CAFF-025 Async loading cache (`getOrLoad`, coalescing, `refresh`)
+#### CAFF-025 Async loading cache (`getOrLoad`, coalescing, `refresh`) — ✅ DONE
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-014, CAFF-023
 - **Files**: `src/async-cache.ts`, `test/async-cache.test.ts`
 - **Acceptance Criteria**:
@@ -294,7 +308,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Decide & document whether pending entries count toward size/weight and whether they can be evicted.
 - **Implementation Notes**: Track pending loads with a per-key generation token, not just "store the promise as value". Stampede protection comes from sharing the in-flight promise; correctness comes from the token check on settle.
 
-#### CAFF-026 Utility methods (getIfPresent, putAll, invalidate, invalidateAll, asMap view)
+#### CAFF-026 Utility methods (getIfPresent, putAll, invalidate, invalidateAll, asMap view) — ✅ DONE
 - **Type**: Feature | **Priority**: P2 | **Size**: S | **Depends On**: CAFF-014
 - **Files**: `src/cache.ts`, `test/api-surface.test.ts`
 - **Acceptance Criteria**:

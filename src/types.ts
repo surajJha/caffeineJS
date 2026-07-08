@@ -44,8 +44,24 @@ export interface CacheStats {
 }
 
 export interface CacheOptions<K, V> {
-  /** Maximum number of entries retained before size-based eviction. */
-  maximumSize: number;
+  /**
+   * Maximum number of entries retained before size-based eviction. Mutually
+   * exclusive with {@link maximumWeight}.
+   */
+  maximumSize?: number;
+  /**
+   * Maximum total weight retained before eviction. Requires {@link weigher}
+   * and is mutually exclusive with {@link maximumSize}.
+   */
+  maximumWeight?: number;
+  /** Computes each entry's weight; required when using {@link maximumWeight}. */
+  weigher?: Weigher<K, V>;
+  /**
+   * Expected steady-state entry count for a weight-bounded cache. Sizes the
+   * frequency sketch and the initial store; the store grows past it as needed.
+   * Defaults to a small value.
+   */
+  expectedEntries?: number;
   /** Enable the doorkeeper bloom filter (default true). */
   doorkeeper?: boolean;
   /**

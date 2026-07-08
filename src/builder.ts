@@ -34,6 +34,28 @@ export class CacheBuilder<K, V> {
     return this;
   }
 
+  /** Bound the cache by total weight instead of entry count. */
+  maximumWeight(max: number, weigher: (key: K, value: V) => number): this {
+    this.options.maximumWeight = max;
+    this.options.weigher = weigher;
+    delete this.options.maximumSize;
+    return this;
+  }
+
+  /** Bound the cache by entry count. */
+  maximumSize(max: number): this {
+    this.options.maximumSize = max;
+    delete this.options.maximumWeight;
+    delete this.options.weigher;
+    return this;
+  }
+
+  /** Hint the expected steady-state entry count (weight-bounded caches). */
+  expectedEntries(n: number): this {
+    this.options.expectedEntries = n;
+    return this;
+  }
+
   /** Enable/disable adaptive hill-climbing window sizing (default on). */
   adaptive(enabled = true): this {
     this.options.adaptive = enabled;

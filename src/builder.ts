@@ -1,5 +1,12 @@
 import { CaffeineCache } from "./cache.js";
-import type { Cache, CacheOptions, RemovalListener } from "./types.js";
+import { CaffeineAsyncCache } from "./async-cache.js";
+import type {
+  AsyncLoader,
+  AsyncLoadingCache,
+  Cache,
+  CacheOptions,
+  RemovalListener,
+} from "./types.js";
 
 /**
  * Fluent builder for a {@link Cache}. Also accepts a plain options object.
@@ -58,6 +65,11 @@ export class CacheBuilder<K, V> {
 
   build(): Cache<K, V> {
     return new CaffeineCache<K, V>(this.options);
+  }
+
+  /** Builds a read-through async cache backed by `loader`. */
+  buildAsync(loader: AsyncLoader<K, V>): AsyncLoadingCache<K, V> {
+    return new CaffeineAsyncCache<K, V>({ ...this.options, loader });
   }
 }
 

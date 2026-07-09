@@ -79,7 +79,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 
 ### M0 — Foundation
 
-#### CAFF-001 Bootstrap repository & package manifest
+#### CAFF-001 Bootstrap repository & package manifest — ✅ DONE
 - **Type**: Chore | **Priority**: P0 | **Size**: S | **Depends On**: None
 - **Files**: `package.json`, `.gitignore`, `.editorconfig`, `README.md`, `LICENSE`
 - **Acceptance Criteria**:
@@ -88,7 +88,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] `npm install` succeeds on clean clone.
 - **Implementation Notes**: Use `exports` conditional map for ESM/CJS/types. Keep `dependencies: {}`.
 
-#### CAFF-002 TypeScript + build pipeline (ESM/CJS/UMD + d.ts)
+#### CAFF-002 TypeScript + build pipeline (ESM/CJS/UMD + d.ts) — ✅ DONE
 - **Type**: Chore | **Priority**: P0 | **Size**: M | **Depends On**: CAFF-001
 - **Files**: `tsconfig.json`, `tsup.config.ts`, `src/index.ts`
 - **Acceptance Criteria**:
@@ -97,7 +97,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] `are-the-types-wrong` (`attw`) passes; `publint` passes.
 - **Implementation Notes**: Use `tsup` (esbuild) for multi-format bundling. UMD/global name `CaffeineJS`.
 
-#### CAFF-003 Test runner, lint, format, coverage
+#### CAFF-003 Test runner, lint, format, coverage — ✅ DONE
 - **Type**: Chore | **Priority**: P0 | **Size**: S | **Depends On**: CAFF-001
 - **Files**: `vitest.config.ts`, `eslint.config.js`, `.prettierrc`, `package.json` scripts
 - **Acceptance Criteria**:
@@ -105,7 +105,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Coverage provider configured (v8) with thresholds placeholder.
 - **Implementation Notes**: Vitest runs in both `node` and `jsdom`/`happy-dom` environments.
 
-#### CAFF-004 Public API contract & type surface (interfaces only)
+#### CAFF-004 Public API contract & type surface (interfaces only) — ✅ DONE
 - **Type**: Spike | **Priority**: P0 | **Size**: S | **Depends On**: CAFF-002
 - **Files**: `src/types.ts`, `src/index.ts`
 - **Acceptance Criteria**:
@@ -114,7 +114,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Type-only test file compiles (`tsd` or `vitest` type asserts).
 - **Implementation Notes**: Mirror Caffeine's builder ergonomics but idiomatic JS (options object + fluent builder). No implementation yet.
 
-#### CAFF-005 CI pipeline (GitHub Actions)
+#### CAFF-005 CI pipeline (GitHub Actions) — ✅ DONE
 - **Type**: Chore | **Priority**: P1 | **Size**: S | **Depends On**: CAFF-002, CAFF-003
 - **Files**: `.github/workflows/ci.yml`
 - **Acceptance Criteria**:
@@ -126,7 +126,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 
 ### M1 — Core Policy (W-TinyLFU engine)
 
-#### CAFF-009 Storage-layout perf gate (SoA prototype) — **blocks the rest of M1**
+#### CAFF-009 Storage-layout perf gate (SoA prototype) — ✅ DONE
 - **Type**: Spike | **Priority**: P0 | **Size**: M | **Depends On**: CAFF-004
 - **Files**: `bench/storage-proto/*`, `src/store/soa-store.ts` (skeleton)
 - **Acceptance Criteria**:
@@ -136,7 +136,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Decision recorded: proceed with SoA (default) — do not build the policy stack on a layout that fails this gate.
 - **Implementation Notes**: This de-risks the #1 scale concern before CAFF-012/013/014. If SoA underperforms for a key-type mix, document why and adjust before proceeding.
 
-#### CAFF-010 Frequency sketch — Count-Min Sketch (4-bit counters)
+#### CAFF-010 Frequency sketch — Count-Min Sketch (4-bit counters) — ✅ DONE
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-004
 - **Files**: `src/policy/frequency-sketch.ts`, `test/frequency-sketch.test.ts`
 - **Acceptance Criteria**:
@@ -147,7 +147,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Deterministic unit tests validate saturation, min-estimate, and reset behavior.
 - **Implementation Notes**: Port the *algorithm/idea* from Caffeine's `FrequencySketch`, re-implemented in idiomatic TS. Use a good hash spreader (e.g. mix like `xmur3`/`fmix32`). **Use Caffeine's block/bit-sliced layout**: keep a key's 4 counters within one 64-byte block for typed-array locality (start with classic 4-row CMS, then migrate).
 
-#### CAFF-011 Hashing & key coercion strategy
+#### CAFF-011 Hashing & key coercion strategy — ✅ DONE
 - **Type**: Feature | **Priority**: P0 | **Size**: M | **Depends On**: CAFF-004
 - **Files**: `src/util/hash.ts`, `test/hash.test.ts`
 - **Acceptance Criteria**:
@@ -156,7 +156,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Good avalanche/distribution verified by a spread test.
 - **Implementation Notes**: `Map` handles equality/lookup; sketch only needs a 32-bit hash. Use `WeakMap<object, id>` counter for object keys.
 
-#### CAFF-012 SLRU main region (probation + protected) on unified SoA
+#### CAFF-012 SLRU main region (probation + protected) on unified SoA — ✅ DONE
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-004, CAFF-009
 - **Files**: `src/store/soa-store.ts`, `src/policy/slru.ts`, `test/slru.test.ts`
 - **Acceptance Criteria**:
@@ -166,7 +166,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] On access, entries promote probation → protected (MRU); eviction victim is LRU of probation.
 - **Implementation Notes**: Single index space + sentinel head slots per queue (see §2b). Movement between segments is DLL unlink + relink + `segment[idx]` update. Prior art: `isaacs/lru-cache`, `mnemonist`, `velo-org/velo` (per-segment SoA — we unify).
 
-#### CAFF-013 Admission window (LRU) + TinyLFU admission gate
+#### CAFF-013 Admission window (LRU) + TinyLFU admission gate — ✅ DONE
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-010, CAFF-012
 - **Files**: `src/policy/window-tinylfu.ts`, `test/window-tinylfu.test.ts`
 - **Acceptance Criteria**:
@@ -178,7 +178,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Policy exposed behind an internal `EvictionPolicy` interface for testability.
 - **Implementation Notes**: This is the heart of W-TinyLFU. Keep window/main sizing configurable for the adaptive step in CAFF-041. Admission gate consults the doorkeeper (CAFF-016) before the CMS.
 
-#### CAFF-016 Doorkeeper bloom filter (one-hit-wonder guard)
+#### CAFF-016 Doorkeeper bloom filter (one-hit-wonder guard) — ✅ DONE
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-010
 - **Files**: `src/policy/doorkeeper.ts`, `src/policy/window-tinylfu.ts`, `test/doorkeeper.test.ts`
 - **Acceptance Criteria**:
@@ -188,7 +188,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Can be disabled via `options.doorkeeper: false`.
 - **Implementation Notes**: `Uint32Array` bitset, k hash functions. Effective frequency = `doorkeeper.contains(h) ? 1 : 0) + cms.frequency(h)`. Reset alongside CMS aging.
 
-#### CAFF-014 Bounded cache core (get/set/has/delete/clear/size)
+#### CAFF-014 Bounded cache core (get/set/has/delete/clear/size) — ✅ DONE
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-013, CAFF-011
 - **Files**: `src/cache.ts`, `src/builder.ts`, `src/index.ts`, `test/cache.test.ts`
 - **Acceptance Criteria**:
@@ -198,7 +198,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Overwriting existing key updates value without double-counting size.
 - **Implementation Notes**: Wire `Map<K, index>` + SoA store (CAFF-012) + policy. All mutations funnel through policy hooks (`onAdd`/`onAccess`/`onUpdate`/`onRemove`). Iterators are weakly-consistent; removal listeners fire strictly post-commit (see §2b).
 
-#### CAFF-015 Correctness invariants & property tests
+#### CAFF-015 Correctness invariants & property tests — ✅ DONE
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-014
 - **Files**: `test/invariants.test.ts`
 - **Acceptance Criteria**:
@@ -522,6 +522,20 @@ Parallelizable within M1: CAFF-010, CAFF-011, CAFF-012 (and CAFF-016 after 010) 
 - v1.0.0 published with provenance; fresh-install smoke passes (CAFF-044).
 - Event tap adds zero measurable overhead when disabled (CAFF-050); CLI inspector renders live against a running cache (CAFF-051).
 - Byte-based bounding documented as approximate with a working estimator (CAFF-027).
+
+---
+
+## 7. Remaining Work (post-v1.0)
+
+Functional:
+- **CAFF-021 Variable expiry** — per-entry `Expiry` calculator (`expireAfter` create/update/read hooks) instead of a single global TTL.
+- **Dashboard v1.1** — time-series charts (hit rate, size, eviction rate) and a frequency heatmap.
+
+Tooling / packaging gaps:
+- Add lint (`eslint`) and format (`prettier` or `dprint`) scripts to CAFF-003.
+- Add `publint` and `are-the-types-wrong` checks to CI.
+- Emit a UMD/global build (`dist/index.global.js`) for CAFF-002.
+- Configure coverage thresholds in CI.
 
 ---
 

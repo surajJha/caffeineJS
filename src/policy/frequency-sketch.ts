@@ -27,8 +27,9 @@ export class FrequencySketch {
   private readonly sampleSize: number;
   private size = 0;
   private readonly doorkeeperEnabled: boolean;
+  private readonly onReset?: () => void;
 
-  constructor(capacity: number, doorkeeper = true) {
+  constructor(capacity: number, doorkeeper = true, onReset?: () => void) {
     const width = nextPowerOfTwo(Math.max(capacity, 8));
     this.width = width;
     this.mask = width - 1;
@@ -36,6 +37,7 @@ export class FrequencySketch {
     this.table = new Uint8Array((width * DEPTH) >> 1);
     this.sampleSize = width * 10;
     this.doorkeeperEnabled = doorkeeper;
+    this.onReset = onReset;
     // Doorkeeper sized to width bits, rounded to 32-bit words.
     const doorWords = Math.max(1, width >> 5);
     this.door = new Uint32Array(doorWords);
@@ -124,5 +126,6 @@ export class FrequencySketch {
     }
     this.door.fill(0);
     this.size = 0;
+    if (this.onReset) this.onReset();
   }
 }

@@ -1,5 +1,6 @@
 import { CaffeineCache } from "./cache.js";
 import { CaffeineAsyncCache } from "./async-cache.js";
+import { CacheObserver } from "./inspect/events.js";
 import type {
   AsyncLoader,
   AsyncLoadingCache,
@@ -7,6 +8,7 @@ import type {
   CacheOptions,
   RemovalListener,
 } from "./types.js";
+import type { ObserverCallback, ObserverOptions } from "./inspect/events.js";
 
 /**
  * Fluent builder for a {@link Cache}. Also accepts a plain options object.
@@ -82,6 +84,18 @@ export class CacheBuilder<K, V> {
 
   removalListener(listener: RemovalListener<K, V>): this {
     this.options.removalListener = listener;
+    return this;
+  }
+
+  /**
+   * Attach an event observer to see hit/miss/admit/reject/promote/demote/evict
+   * events in real time. Zero overhead when not registered.
+   */
+  observer(
+    callback: ObserverCallback<K, V>,
+    options?: ObserverOptions,
+  ): this {
+    this.options.observer = new CacheObserver<K, V>(callback, options);
     return this;
   }
 

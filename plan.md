@@ -374,7 +374,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 
 ### M4 — Hardening & Release
 
-#### CAFF-040 Efficiency validation vs Caffeine claims
+#### CAFF-040 Efficiency validation vs Caffeine claims — ✅ DONE
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-034, CAFF-015
 - **Files**: `test/efficiency.test.ts`, `bench/hit-ratio.ts`
 - **Acceptance Criteria**:
@@ -392,7 +392,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [x] No throughput regression: perf gate still 6.2M/s hot-get (climb runs once per ~10M accesses).
 - **Implementation Notes**: Faithful to Caffeine's climb (restart threshold 0.05, step-percent 0.0625, decay 0.9) plus a warmup sample and a noise-tolerant resize that rebalances protected/window overflow into probation without evicting (total capacity unchanged). Validation harness: `bench/adaptive.ts` (zipfian skew 2/3 + recency-shift). **Reality check** (rubber-duck): an absolute "never regresses" guarantee is unachievable for any online noisy hill-climber on a flat surface; the realistic guarantee is *bounded sub-1pp exploration cost on stable traces, large gains on dynamic ones*, which the validation confirms.
 
-#### CAFF-042 Fuzz & stress testing
+#### CAFF-042 Fuzz & stress testing — ✅ DONE
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-015
 - **Files**: `test/fuzz.test.ts`
 - **Acceptance Criteria**:
@@ -421,7 +421,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 
 ### M5 — Observability & Visualization
 
-#### CAFF-050 Instrumentation event tap (zero-overhead when off)
+#### CAFF-050 Instrumentation event tap (zero-overhead when off) — ✅ DONE
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-014, CAFF-023
 - **Files**: `src/inspect/events.ts`, `src/cache.ts`, `test/events.test.ts`
 - **Acceptance Criteria**:
@@ -431,7 +431,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Optional sampling (`{ sampleRate }`) to cap event volume on hot caches.
 - **Implementation Notes**: This is the shared backbone for BOTH visualizers. Keep it a lightweight emitter, not a full pub/sub lib. Never emit values unless `includeValues: true` (privacy/perf).
 
-#### CAFF-051 CLI/TUI live inspector
+#### CAFF-051 CLI/TUI live inspector — ✅ DONE
 - **Type**: Feature | **Priority**: P2 | **Size**: L | **Depends On**: CAFF-050
 - **Files**: `src/inspect/cli/*`, `bin/caffeine-inspect.ts`, `test/cli.test.ts`
 - **Acceptance Criteria**:

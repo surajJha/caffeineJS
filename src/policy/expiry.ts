@@ -104,14 +104,18 @@ class TimerWheel {
    * rescheduled into a finer level, expired ones are handed to `expire`.
    */
   advance(now: number, deadlineOf: (idx: number) => number, expire: ExpireCallback): void {
-    const prevTicksTime = this.nowTicks;
+    const prevNow = this.nowTicks;
     this.nowTicks = now;
     for (let level = 0; level < LEVELS; level++) {
       const span = SPAN[level]!;
-      const prevTicks = Math.floor(prevTicksTime / span);
+      const prevTicks = Math.floor(prevNow / span);
       const currTicks = Math.floor(now / span);
       const delta = currTicks - prevTicks;
-      if (delta <= 0) break;
+      if (delta < 0) continue;
+      // Level 0 stores near-term deadlines; if real time moved but not enough
+      // to cross a tick boundary, the current bucket can still contain entries
+      // whose deadline is now <= now.
+      if (delta === 0 && (level !== 0 || now <= prevNow)) continue;
       this.expireLevel(level, prevTicks, delta, deadlineOf, expire);
     }
   }

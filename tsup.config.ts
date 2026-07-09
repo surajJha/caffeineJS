@@ -5,6 +5,8 @@ export default defineConfig({
     index: "src/index.ts",
     estimate: "src/estimate.ts",
     react: "src/react/index.ts",
+    inspect: "src/inspect/index.ts",
+    "inspect-bin": "src/inspect/bin.ts",
   },
   format: ["esm", "cjs"],
   dts: true,
@@ -12,7 +14,7 @@ export default defineConfig({
   clean: true,
   treeshake: true,
   target: "es2020",
-  external: ["react"],
+  external: ["react", "caffeine-js"],
   outExtension({ format }) {
     return { js: format === "esm" ? ".mjs" : ".cjs" };
   },

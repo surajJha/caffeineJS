@@ -34,7 +34,15 @@
       "types": "./dist/react.d.ts",
       "import": "./dist/react.mjs",
       "require": "./dist/react.cjs"
+    },
+    "./inspect": {
+      "types": "./dist/inspect.d.ts",
+      "import": "./dist/inspect.mjs",
+      "require": "./dist/inspect.cjs"
     }
+  },
+  "bin": {
+    "caffeine-inspect": "./dist/inspect-bin.mjs"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",

@@ -17,6 +17,75 @@ export type RemovalListener<K, V> = (
 /** Computes a positive integer weight for an entry (for weight-bounded caches). */
 export type Weigher<K, V> = (key: K, value: V) => number;
 
+/** Snapshot of segment occupancy at the moment an event fires. */
+export interface Occupancy {
+  windowWeight: number;
+  probationWeight: number;
+  protectedWeight: number;
+  weightedSize: number;
+  windowMax: number;
+  protectedMax: number;
+}
+
+/** Observer interface consumed by the cache; implemented by {@link CacheObserver}. */
+export interface CacheObserver<K, V> {
+  readonly active: boolean;
+  emitHit(args: {
+    key: K;
+    value: V;
+    hash: number;
+    segment: number;
+    freq: number;
+    occupancy: Occupancy;
+  }): void;
+  emitMiss(args: { key: K; occupancy: Occupancy }): void;
+  emitAdmit(args: {
+    key: K;
+    value: V;
+    hash: number;
+    segment: number;
+    freq: number;
+    occupancy: Occupancy;
+  }): void;
+  emitReject(args: {
+    key: K;
+    value: V;
+    hash: number;
+    segment: number;
+    freq: number;
+    occupancy: Occupancy;
+  }): void;
+  emitPromote(args: {
+    key: K;
+    value: V;
+    hash: number;
+    freq: number;
+    occupancy: Occupancy;
+  }): void;
+  emitDemote(args: {
+    key: K;
+    value: V;
+    hash: number;
+    freq: number;
+    occupancy: Occupancy;
+  }): void;
+  emitEvict(args: {
+    key: K;
+    value: V;
+    hash: number;
+    segment: number;
+    freq: number;
+    cause: RemovalCause;
+    occupancy: Occupancy;
+  }): void;
+  emitResize(args: {
+    windowMax: number;
+    protectedMax: number;
+    occupancy: Occupancy;
+  }): void;
+  emitAge(args: { occupancy: Occupancy }): void;
+}
+
 /** Loads a value for a missing key. May be sync or async; receives an optional
  * AbortSignal that fires when the load is superseded/invalidated. */
 export type AsyncLoader<K, V> = (
@@ -72,6 +141,8 @@ export interface CacheOptions<K, V> {
   adaptive?: boolean;
   /** Track hit/miss/eviction statistics (default false, ~zero overhead). */
   recordStats?: boolean;
+  /** Opt-in event observer. Zero overhead when not registered. */
+  observer?: CacheObserver<K, V>;
   /** Invoked after an entry is removed, evicted, or replaced. */
   removalListener?: RemovalListener<K, V>;
   /**

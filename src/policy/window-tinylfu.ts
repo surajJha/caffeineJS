@@ -1,5 +1,6 @@
 import { FrequencySketch } from "./frequency-sketch.js";
 import { SoaStore, NIL } from "../store/soa-store.js";
+import type { CacheObserver, Occupancy } from "../types.js";
 
 /** Segment tags stored in `store.segment`. */
 const WINDOW = 0;
@@ -68,18 +69,29 @@ export class WindowTinyLfu<K, V> {
   private readonly readBuffer: Int32Array;
   private readBufferLen = 0;
 
+  /** Opt-in event observer (zero cost when undefined). */
+  private observer?: CacheObserver<K, V>;
+  private hasObserver: boolean;
+
   constructor(
     store: SoaStore<K, V>,
     doorkeeper = true,
     adaptive = true,
     maximumWeight?: number,
     expectedEntries?: number,
+    observer?: CacheObserver<K, V>,
   ) {
     this.store = store;
+    this.observer = observer;
+    this.hasObserver = observer !== undefined;
     const bound = maximumWeight ?? store.capacity;
     this.maximumWeight = bound;
     const sketchEntries = expectedEntries ?? store.capacity;
-    this.sketch = new FrequencySketch(sketchEntries, doorkeeper);
+    this.sketch = new FrequencySketch(sketchEntries, doorkeeper, () => {
+      if (this.hasObserver) {
+        this.observer!.emitAge({ occupancy: this.occupancy() });
+      }
+    });
     this.readBuffer = new Int32Array(READ_BUFFER_SIZE);
 
     this.windowMax = Math.max(1, Math.floor(bound * 0.01));
@@ -97,6 +109,34 @@ export class WindowTinyLfu<K, V> {
   /** Current admission-window maximum (exposed for tests/observability). */
   get windowMaximum(): number {
     return this.windowMax;
+  }
+
+  /** Current protected-region maximum. */
+  get protectedMaximum(): number {
+    return this.protectedMax;
+  }
+
+  /** Attach/detach an observer after construction (used by the inspector). */
+  setObserver(observer?: CacheObserver<K, V>): void {
+    this.observer = observer;
+    this.hasObserver = observer !== undefined;
+  }
+
+  /** Estimated frequency of the key currently in `idx`. */
+  frequencyAt(idx: number): number {
+    return this.sketch.frequency(this.store.hashAt(idx));
+  }
+
+  /** Current segment-occupancy snapshot. */
+  occupancy(): Occupancy {
+    return {
+      windowWeight: this.windowWeight,
+      probationWeight: this.probationWeight,
+      protectedWeight: this.protectedWeight,
+      weightedSize: this.weightedSize,
+      windowMax: this.windowMax,
+      protectedMax: this.protectedMax,
+    };
   }
 
   /** Records a frequency observation for a key hash. */
@@ -247,6 +287,14 @@ export class WindowTinyLfu<K, V> {
     this.windowMax = newWindowMax;
     this.protectedMax = Math.max(0, this.protectedMax - applied);
 
+    if (this.hasObserver) {
+      this.observer!.emitResize({
+        windowMax: this.windowMax,
+        protectedMax: this.protectedMax,
+        occupancy: this.occupancy(),
+      });
+    }
+
     const s = this.store;
     while (this.windowWeight > this.windowMax) {
       const victim = s.back(s.WINDOW_HEAD);
@@ -281,6 +329,15 @@ export class WindowTinyLfu<K, V> {
     const w = s.weightAt(idx);
     s.unlink(idx);
     this.probationWeight -= w;
+    if (this.hasObserver) {
+      this.observer!.emitPromote({
+        key: s.keyAt(idx),
+        value: s.valueAt(idx),
+        hash: s.hashAt(idx),
+        freq: this.frequencyAt(idx),
+        occupancy: this.occupancy(),
+      });
+    }
     // Make room in protected for this entry's weight.
     while (this.protectedWeight + w > this.protectedMax) {
       const demote = s.back(s.PROTECTED_HEAD);
@@ -291,6 +348,15 @@ export class WindowTinyLfu<K, V> {
       s.pushFront(s.PROBATION_HEAD, demote);
       s.segment[demote] = PROBATION;
       this.probationWeight += dw;
+      if (this.hasObserver) {
+        this.observer!.emitDemote({
+          key: s.keyAt(demote),
+          value: s.valueAt(demote),
+          hash: s.hashAt(demote),
+          freq: this.frequencyAt(demote),
+          occupancy: this.occupancy(),
+        });
+      }
     }
     s.pushFront(s.PROTECTED_HEAD, idx);
     s.segment[idx] = PROTECTED;
@@ -331,6 +397,27 @@ export class WindowTinyLfu<K, V> {
 
       const freqC = this.sketch.frequency(s.hashAt(candidate));
       const freqV = this.sketch.frequency(s.hashAt(victim));
+      if (this.hasObserver) {
+        if (freqC > freqV) {
+          this.observer!.emitAdmit({
+            key: s.keyAt(candidate),
+            value: s.valueAt(candidate),
+            hash: s.hashAt(candidate),
+            segment: PROBATION,
+            freq: freqC,
+            occupancy: this.occupancy(),
+          });
+        } else {
+          this.observer!.emitReject({
+            key: s.keyAt(candidate),
+            value: s.valueAt(candidate),
+            hash: s.hashAt(candidate),
+            segment: PROBATION,
+            freq: freqC,
+            occupancy: this.occupancy(),
+          });
+        }
+      }
       if (freqC > freqV) {
         return this.evictSlot(victim, PROBATION, sink); // admit candidate
       }

@@ -7,6 +7,8 @@ function walk(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
+    // The inspect subpath is intentionally Node-only (CLI/TUI).
+    if (p.includes("src/inspect")) continue;
     if (statSync(p).isDirectory()) out.push(...walk(p));
     else if (p.endsWith(".ts")) out.push(p);
   }

@@ -5,6 +5,7 @@ import { hashKey } from "./util/hash.js";
 import { wallClockNow } from "./env.js";
 import type {
   Cache,
+  CacheObserver,
   CacheOptions,
   CacheStats,
   RemovalCause,
@@ -23,6 +24,8 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
   private readonly expiry?: ExpiryPolicy;
   private readonly weigher?: (key: K, value: V) => number;
   private readonly maxBound: number;
+  private observer?: CacheObserver<K, V>;
+  private hasObserver: boolean;
 
   private hits = 0;
   private misses = 0;
@@ -48,10 +51,13 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
       doorkeeper = true,
       adaptive = true,
       recordStats = false,
+      observer,
       expireAfterWrite,
       expireAfterAccess,
       clock = wallClockNow,
     } = options;
+    this.observer = observer;
+    this.hasObserver = observer !== undefined;
 
     const weighted = maximumWeight !== undefined;
     if (weighted === (maximumSize !== undefined)) {
@@ -79,6 +85,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
         adaptive,
         maximumWeight,
         expected,
+        observer,
       );
       this.maxBound = maximumWeight!;
       this.weigher = weigher;
@@ -91,6 +98,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
         adaptive,
         size,
         size,
+        observer,
       );
       this.maxBound = size;
     }
@@ -105,11 +113,29 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
     this.evictSink = (victim: number) => {
       const key = this.store.keyAt(victim);
       const value = this.store.valueAt(victim);
+      if (this.hasObserver) {
+        this.observer!.emitEvict({
+          key,
+          value,
+          hash: this.store.hashAt(victim),
+          segment: this.store.segment[victim] as number,
+          freq: this.policy.frequencyAt(victim),
+          cause: "size",
+          occupancy: this.policy.occupancy(),
+        });
+      }
       if (this.expiry) this.expiry.onRemove(victim);
       this.store.freeSlot(victim);
       if (this.statsEnabled) this.evictions++;
       if (this.listener) this.enqueue(key, value, "size");
     };
+  }
+
+  /** @internal Attach (or replace/detach) the event observer at runtime. */
+  attachObserver(observer?: CacheObserver<K, V>): void {
+    this.observer = observer;
+    this.hasObserver = observer !== undefined;
+    this.policy.setObserver(observer);
   }
 
   get capacity(): number {
@@ -125,6 +151,9 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
     if (idx === NIL) {
       if (this.statsEnabled) this.misses++;
       this.policy.recordSample(false);
+      if (this.hasObserver) {
+        this.observer!.emitMiss({ key, occupancy: this.policy.occupancy() });
+      }
       return undefined;
     }
     if (this.expiry) {
@@ -133,6 +162,9 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
         this.expireLazy(idx);
         if (this.statsEnabled) this.misses++;
         this.policy.recordSample(false);
+        if (this.hasObserver) {
+          this.observer!.emitMiss({ key, occupancy: this.policy.occupancy() });
+        }
         this.deliverRemovals();
         return undefined;
       }
@@ -141,6 +173,16 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
     this.policy.onAccessBuffered(idx);
     this.policy.recordSample(true);
     if (this.statsEnabled) this.hits++;
+    if (this.hasObserver) {
+      this.observer!.emitHit({
+        key,
+        value: this.store.valueAt(idx),
+        hash: this.store.hashAt(idx),
+        segment: this.store.segment[idx] as number,
+        freq: this.policy.frequencyAt(idx),
+        occupancy: this.policy.occupancy(),
+      });
+    }
     return this.store.valueAt(idx);
   }
 
@@ -176,6 +218,17 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
       }
       if (this.expiry) this.expiry.onWrite(existing, now, false);
       if (this.listener && old !== value) this.enqueue(key, old, "replaced");
+      if (this.hasObserver && old !== value) {
+        this.observer!.emitEvict({
+          key,
+          value: old,
+          hash: this.store.hashAt(existing),
+          segment: this.store.segment[existing] as number,
+          freq: this.policy.frequencyAt(existing),
+          cause: "replaced",
+          occupancy: this.policy.occupancy(),
+        });
+      }
       this.deliverRemovals();
       return;
     }
@@ -208,10 +261,12 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
     const value = this.store.valueAt(idx);
     const expired =
       this.expiry !== undefined && this.expiry.isExpired(idx, this.expiry.now());
+    const cause: RemovalCause = expired ? "expired" : "explicit";
+    this.emitEvict(idx, cause);
     this.policy.onRemove(idx);
     if (this.expiry) this.expiry.onRemove(idx);
     this.store.freeSlot(idx);
-    if (this.listener) this.enqueue(key, value, expired ? "expired" : "explicit");
+    if (this.listener) this.enqueue(key, value, cause);
     this.deliverRemovals();
     return !expired;
   }
@@ -232,6 +287,11 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
     if (this.listener) {
       for (const idx of this.store.slots()) {
         this.enqueue(this.store.keyAt(idx), this.store.valueAt(idx), "explicit");
+      }
+    }
+    if (this.hasObserver) {
+      for (const idx of this.store.slots()) {
+        this.emitEvict(idx, "explicit");
       }
     }
     if (this.expiry) this.expiry.reset(this.store.slots());
@@ -319,6 +379,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
   private expireLazy(idx: number): void {
     const key = this.store.keyAt(idx);
     const value = this.store.valueAt(idx);
+    this.emitEvict(idx, "expired");
     this.policy.onRemove(idx);
     this.expiry!.onRemove(idx);
     this.store.freeSlot(idx);
@@ -330,6 +391,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
   private readonly wheelExpire = (idx: number): void => {
     const key = this.store.keyAt(idx);
     const value = this.store.valueAt(idx);
+    this.emitEvict(idx, "expired");
     this.policy.onRemove(idx);
     this.expiry!.clearDeadline(idx);
     this.store.freeSlot(idx);
@@ -339,6 +401,19 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
 
   private enqueue(key: K, value: V, cause: RemovalCause): void {
     this.removals.push({ key, value, cause });
+  }
+
+  private emitEvict(idx: number, cause: RemovalCause): void {
+    if (!this.hasObserver) return;
+    this.observer!.emitEvict({
+      key: this.store.keyAt(idx),
+      value: this.store.valueAt(idx),
+      hash: this.store.hashAt(idx),
+      segment: this.store.segment[idx] as number,
+      freq: this.policy.frequencyAt(idx),
+      cause,
+      occupancy: this.policy.occupancy(),
+    });
   }
 
   /** Delivers queued removal records after state is consistent. Re-entrant

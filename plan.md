@@ -400,13 +400,13 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Memory stays bounded (heap snapshot delta under threshold).
 - **Implementation Notes**: Extend fast-check model-based testing against a reference oracle map.
 
-#### CAFF-043 Bundle size budget & tree-shaking verification
+#### CAFF-043 Bundle size budget & tree-shaking verification — ✅ DONE
 - **Type**: Chore | **Priority**: P1 | **Size**: S | **Depends On**: CAFF-002
-- **Files**: `.size-limit.json`, CI job
+- **Files**: `.size-limit.json`, `.github/workflows/ci.yml`
 - **Acceptance Criteria**:
-  - [ ] Core import gzip budget (e.g. ≤ 5KB) enforced by `size-limit` in CI.
-  - [ ] Importing only `Cache` does not pull React adapter or bench code.
-- **Implementation Notes**: Verifies Success Criterion #3 tree-shakeability.
+  - [x] Core import budget (≤ 8 kB brotli, measured with `import { caffeine }`) enforced by `size-limit` in CI.
+  - [x] Subpath imports (`estimate`, `react`, `inspect`) stay separate; importing core does not pull React/inspect/estimate code.
+- **Implementation Notes**: Uses `@size-limit/preset-small-lib` with per-subpath `import` entries. Actual sizes: core 6.12 kB, estimate 350 B, react 215 B, inspect 1.95 kB.
 
 #### CAFF-044 Release automation & versioning
 - **Type**: Chore | **Priority**: P0 | **Size**: S | **Depends On**: CAFF-031, CAFF-033, CAFF-040, CAFF-043

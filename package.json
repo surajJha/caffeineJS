@@ -71,12 +71,14 @@
     "bench:throughput": "node --expose-gc --import tsx bench/throughput.ts",
     "bench:hitratio": "tsx bench/hit-ratio.ts",
     "docs:api": "typedoc",
+    "size": "size-limit",
     "smoke:node": "node scripts/smoke-node.mjs",
     "smoke:worker": "node scripts/smoke-worker.test.mjs",
     "smoke:browser": "node scripts/smoke-browser.mjs",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
+    "@size-limit/preset-small-lib": "^12.1.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^26.1.1",
@@ -88,6 +90,7 @@
     "lru-cache": "^11.5.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "size-limit": "^12.1.0",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typedoc": "^0.27.6",

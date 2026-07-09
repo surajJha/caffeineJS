@@ -1,0 +1,26 @@
+[
+  {
+    "name": "caffeine-js core (import { caffeine })",
+    "path": "dist/index.mjs",
+    "import": "{ caffeine }",
+    "limit": "8 kB"
+  },
+  {
+    "name": "caffeine-js/estimate (import { estimateBytes })",
+    "path": "dist/estimate.mjs",
+    "import": "{ estimateBytes }",
+    "limit": "3 kB"
+  },
+  {
+    "name": "caffeine-js/react (import { useCachedValue })",
+    "path": "dist/react.mjs",
+    "import": "{ useCachedValue }",
+    "limit": "2 kB"
+  },
+  {
+    "name": "caffeine-js/inspect (import { attachInspector })",
+    "path": "dist/inspect.mjs",
+    "import": "{ attachInspector }",
+    "limit": "3 kB"
+  }
+]

@@ -441,15 +441,16 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] Degrades gracefully in non-TTY (prints periodic snapshots).
 - **Implementation Notes**: Use `ink` (React-for-CLI) or `blessed`. Node-only; ships as an optional subpath/bin so it never bloats the core browser bundle. Primary audience: backend/prod debugging over SSH.
 
-#### CAFF-052 Web dashboard (real-time visualization)
+#### CAFF-052 Web dashboard (real-time visualization) — ✅ DONE (v1)
 - **Type**: Feature | **Priority**: P2 | **Size**: XL | **Depends On**: CAFF-050
-- **Files**: `packages/dashboard/*`, `src/inspect/bridge.ts`
+- **Files**: `src/dashboard/index.ts`, `src/dashboard/browser.ts`, `src/dashboard/server.ts`, `test/dashboard-browser.test.ts`, `test/dashboard-server.test.ts`
 - **Acceptance Criteria**:
-  - [ ] Web UI animates the W-TinyLFU flow: entries entering the window, the admission-gate decision (candidate vs victim freq), promotions/demotions, and evictions, in real time.
-  - [ ] Time-series charts (hit rate, size, eviction rate), per-segment occupancy, and a frequency heatmap.
-  - [ ] Two transports: in-browser (subscribe directly to an in-page cache's event tap) and Node (small WS bridge streams events to the browser).
-  - [ ] Backpressure-safe: dashboard sampling/batching so a hot cache can't flood the socket.
-- **Implementation Notes**: The "wow"/teaching showpiece — animating the admission gate is what makes W-TinyLFU's advantage over LRU *visible*. Separate package; consumes the same events as the CLI. Can ship post-1.0.
+  - [x] Web UI renders live segment occupancy bars (window/probation/protected), hit-rate, ops, weighted size, and adaptive-window ratio; admission-gate decisions flash `ADMIT`/`REJECT` with candidate frequency.
+  - [x] Live event log shows hits, misses, admits, rejects, promotes, demotes, evicts, and resizes in real time.
+  - [x] Two transports: in-browser (`renderDashboard(container, cache)`) and Node (`serveDashboard(cache)` via SSE).
+  - [x] Backpressure-safe SSE: per-client bounded buffer drops oldest events when the client cannot keep up; `sampleRate` observer option throttles event volume.
+  - [ ] Time-series charts and frequency heatmap (deferred to v1.1 dashboard polish).
+- **Implementation Notes**: v1 focuses on the core "see the policy work" experience. Uses the same `CacheObserver` event stream as the CLI inspector. Browser and server are separate subpath exports so Node built-ins don't leak into browser bundles.
 
 
 ---

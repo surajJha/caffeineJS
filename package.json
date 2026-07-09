@@ -39,6 +39,16 @@
       "types": "./dist/inspect.d.ts",
       "import": "./dist/inspect.mjs",
       "require": "./dist/inspect.cjs"
+    },
+    "./dashboard": {
+      "types": "./dist/dashboard.d.ts",
+      "import": "./dist/dashboard.mjs",
+      "require": "./dist/dashboard.cjs"
+    },
+    "./dashboard/server": {
+      "types": "./dist/dashboard/server.d.ts",
+      "import": "./dist/dashboard/server.mjs",
+      "require": "./dist/dashboard/server.cjs"
     }
   },
   "bin": {

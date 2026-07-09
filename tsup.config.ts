@@ -7,6 +7,8 @@ export default defineConfig({
     react: "src/react/index.ts",
     inspect: "src/inspect/index.ts",
     "inspect-bin": "src/inspect/bin.ts",
+    dashboard: "src/dashboard/index.ts",
+    "dashboard/server": "src/dashboard/server.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

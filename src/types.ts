@@ -194,6 +194,11 @@ export interface Cache<K, V> {
   readonly capacity: number;
   /** Snapshot of statistics. */
   stats(): CacheStats;
+  /**
+   * @internal Attach or detach a runtime event observer. Used by the inspect
+   * and dashboard subpaths; not part of the stable public API.
+   */
+  attachObserver?(observer?: CacheObserver<K, V>): void;
   keys(): IterableIterator<K>;
   values(): IterableIterator<V>;
   entries(): IterableIterator<[K, V]>;

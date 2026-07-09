@@ -22,5 +22,11 @@
     "path": "dist/inspect.mjs",
     "import": "{ attachInspector }",
     "limit": "3 kB"
+  },
+  {
+    "name": "caffeine-js/dashboard (import { renderDashboard })",
+    "path": "dist/dashboard.mjs",
+    "import": "{ renderDashboard }",
+    "limit": "4 kB"
   }
 ]

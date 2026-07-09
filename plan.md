@@ -431,6 +431,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] **Zero overhead when no observer registered** — hot path checks a single boolean; verified by a bench showing no regression vs baseline.
   - [ ] Optional sampling (`{ sampleRate }`) to cap event volume on hot caches.
 - **Implementation Notes**: This is the shared backbone for BOTH visualizers. Keep it a lightweight emitter, not a full pub/sub lib. Never emit values unless `includeValues: true` (privacy/perf).
+  - Demo script: `node --import tsx scripts/demo-cli.mjs`.
 
 #### CAFF-051 CLI/TUI live inspector — ✅ DONE
 - **Type**: Feature | **Priority**: P2 | **Size**: L | **Depends On**: CAFF-050
@@ -451,6 +452,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [x] Backpressure-safe SSE: per-client bounded buffer drops oldest events when the client cannot keep up; `sampleRate` observer option throttles event volume.
   - [ ] Time-series charts and frequency heatmap (deferred to v1.1 dashboard polish).
 - **Implementation Notes**: v1 focuses on the core "see the policy work" experience. Uses the same `CacheObserver` event stream as the CLI inspector. Browser and server are separate subpath exports so Node built-ins don't leak into browser bundles.
+  - Demo script: `node --import tsx scripts/demo-dashboard.mjs` (serves on `http://localhost:8765` by default).
 
 
 ---

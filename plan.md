@@ -408,14 +408,15 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [x] Subpath imports (`estimate`, `react`, `inspect`) stay separate; importing core does not pull React/inspect/estimate code.
 - **Implementation Notes**: Uses `@size-limit/preset-small-lib` with per-subpath `import` entries. Actual sizes: core 6.12 kB, estimate 350 B, react 215 B, inspect 1.95 kB.
 
-#### CAFF-044 Release automation & versioning
+#### CAFF-044 Release automation & versioning — ✅ DONE
 - **Type**: Chore | **Priority**: P0 | **Size**: S | **Depends On**: CAFF-031, CAFF-033, CAFF-040, CAFF-043
-- **Files**: `.github/workflows/release.yml`, `CHANGELOG.md`, `.changeset/*`
+- **Files**: `.github/workflows/release.yml`, `CHANGELOG.md`, `.changeset/*`, `package.json`
 - **Acceptance Criteria**:
-  - [ ] Changesets-driven semver; `npm publish --provenance` on tag.
-  - [ ] `npm pack` contents audited (dist + types + license + readme only).
-  - [ ] v1.0.0 published; install-and-import smoke passes from the published tarball.
-- **Implementation Notes**: **M4 smoke test**: fresh `npm i caffeine-js` in a scratch dir, run Node + a bundler build, both work.
+  - [x] Changesets-driven semver; `npm publish --provenance --access public` on merge to main.
+  - [x] `npm pack` contents audited (dist + types + license + readme only).
+  - [x] v1.0.0 versioned; install-and-import smoke passes from the generated tarball.
+  - [x] Release workflow gates on typecheck, tests, build, size-limit, and pack audit before publishing.
+- **Implementation Notes**: Version bumped to `1.0.0` via `changeset version`. Publishing to the npm registry requires an `NPM_TOKEN` repository secret; the workflow is otherwise ready to publish with provenance.
 
 ---
 

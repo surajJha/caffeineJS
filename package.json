@@ -1,6 +1,6 @@
 {
   "name": "caffeine-js",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "High-performance isomorphic in-memory cache for JavaScript/TypeScript, implementing the Window-TinyLFU admission policy. Beats LRU/LFU hit ratios. Zero dependencies. Works in Node, browsers, Deno, Bun, and edge runtimes.",
   "type": "module",
   "sideEffects": false,
@@ -72,12 +72,15 @@
     "bench:hitratio": "tsx bench/hit-ratio.ts",
     "docs:api": "typedoc",
     "size": "size-limit",
+    "release": "npm publish --provenance --access public",
+    "pack:audit": "npm pack --dry-run",
     "smoke:node": "node scripts/smoke-node.mjs",
     "smoke:worker": "node scripts/smoke-worker.test.mjs",
     "smoke:browser": "node scripts/smoke-browser.mjs",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@size-limit/preset-small-lib": "^12.1.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",

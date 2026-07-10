@@ -237,6 +237,8 @@ Run the bundled demo:
 npx caffeine-inspect
 ```
 
+![CLI inspector screenshot](assets/cli-screenshot.png)
+
 ### Browser dashboard
 
 ```ts
@@ -249,6 +251,8 @@ const stop = renderDashboard(document.getElementById("root")!, cache);
 ```
 
 A server-side SSE dashboard is also available via `caffeine-js/dashboard/server`.
+
+![Browser dashboard screenshot](assets/dashboard-screenshot.png)
 
 ## Design
 

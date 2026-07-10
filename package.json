@@ -82,7 +82,7 @@
     }
   },
   "bin": {
-    "caffeine-inspect": "./dist/inspect-bin.mjs"
+    "caffeine-inspect": "dist/inspect-bin.mjs"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",

@@ -18,7 +18,7 @@ export default defineConfig({
   splitting: false,
   target: "es2020",
   globalName: "CaffeineJS",
-  external: ["react", "caffeine-js"],
+  external: ["react", "@skj48817/caffeine-js"],
   outExtension({ format }) {
     if (format === "iife") return { js: ".global.js" };
     return { js: format === "esm" ? ".mjs" : ".cjs" };

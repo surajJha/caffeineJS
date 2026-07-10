@@ -11,13 +11,13 @@ A plain LRU evicts the least _recently_ used item, which throws away frequently-
 ## Install
 
 ```sh
-npm install caffeine-js
+npm install /caffeine-js
 ```
 
 ## Quick start
 
 ```ts
-import { caffeine } from "caffeine-js";
+import { caffeine } from "/caffeine-js";
 
 const cache = caffeine<string, number>({ maximumSize: 10_000 })
   .recordStats()
@@ -36,7 +36,7 @@ cache.stats(); // { hitCount, missCount, hitRate, evictionCount, loadSuccessCoun
 Works with CommonJS too:
 
 ```js
-const { caffeine } = require("caffeine-js");
+const { caffeine } = require("/caffeine-js");
 ```
 
 Any key type is supported, including objects (compared by reference, like `Map`):
@@ -54,7 +54,7 @@ byRef.get({ id: 1 }); // undefined — different object identity
 Use it anywhere you would reach for an in-process cache: request deduplication, session storage, computed-result memoization, or buffering database rows.
 
 ```ts
-import { caffeine } from "caffeine-js";
+import { caffeine } from "/caffeine-js";
 
 const userCache = caffeine<string, User>({ maximumSize: 50_000 })
   .expireAfterAccess(60_000) // expire 60s after last read or write
@@ -87,7 +87,7 @@ The package ships ESM, CJS, and IIFE bundles with no runtime dependencies. Use i
 ### With a bundler
 
 ```ts
-import { caffeine } from "caffeine-js";
+import { caffeine } from "/caffeine-js";
 
 const cache = caffeine<string, any>({ maximumSize: 1_000 }).build();
 ```
@@ -96,7 +96,7 @@ const cache = caffeine<string, any>({ maximumSize: 1_000 }).build();
 
 ```html
 <script type="module">
-  import { caffeine } from "https://esm.sh/caffeine-js";
+  import { caffeine } from "https://esm.sh//caffeine-js";
   const cache = caffeine({ maximumSize: 1000 }).build();
   cache.set("k", 42);
   console.log(cache.get("k")); // 42
@@ -106,7 +106,7 @@ const cache = caffeine<string, any>({ maximumSize: 1_000 }).build();
 ### IIFE / global
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/caffeine-js/dist/index.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm//caffeine-js/dist/index.global.js"></script>
 <script>
   const cache = CaffeineJS.caffeine({ maximumSize: 1000 }).build();
   cache.set("k", 42);
@@ -119,7 +119,7 @@ Install the optional peer dependency `react`, then use the hook:
 
 ```tsx
 import { useCachedValue } from "caffeine-js/react";
-import { caffeine } from "caffeine-js";
+import { caffeine } from "/caffeine-js";
 
 const userCache = caffeine<string, User>({ maximumSize: 1_000 }).buildAsync((id) =>
   fetch(`/api/users/${id}`).then((r) => r.json()),
@@ -167,7 +167,7 @@ The `Cache` surface includes `get`/`set`/`peek`/`has`/`delete`/`clear`, helpers 
 ### TTL and expiry
 
 ```ts
-import { caffeine } from "caffeine-js";
+import { caffeine } from "/caffeine-js";
 
 const cache = caffeine<string, string>({})
   .maximumSize(10_000)
@@ -191,7 +191,7 @@ const cache = caffeine<string, number>({ maximumSize: 100 })
 ### Weight and byte bounding
 
 ```ts
-import { caffeine } from "caffeine-js";
+import { caffeine } from "/caffeine-js";
 import { estimateBytes } from "caffeine-js/estimate";
 
 // Bound by total weight instead of entry count.
@@ -224,7 +224,7 @@ Attach the live CLI inspector or browser dashboard to see hits, misses, admissio
 ### CLI inspector
 
 ```ts
-import { caffeine } from "caffeine-js";
+import { caffeine } from "/caffeine-js";
 import { attachInspector } from "caffeine-js/inspect";
 
 const cache = caffeine({ maximumSize: 10_000 }).recordStats().build();
@@ -242,7 +242,7 @@ npx caffeine-inspect
 ### Browser dashboard
 
 ```ts
-import { caffeine } from "caffeine-js";
+import { caffeine } from "/caffeine-js";
 import { renderDashboard } from "caffeine-js/dashboard";
 
 const cache = caffeine({ maximumSize: 10_000 }).build();
@@ -250,7 +250,7 @@ const stop = renderDashboard(document.getElementById("root")!, cache);
 // stop() to detach
 ```
 
-A server-side SSE dashboard is also available via `caffeine-js/dashboard/server`.
+A server-side SSE dashboard is also available via `/caffeine-js/dashboard/server`.
 
 ![Browser dashboard screenshot](assets/dashboard-screenshot.png)
 

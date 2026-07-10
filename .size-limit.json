@@ -1,30 +1,30 @@
 [
   {
-    "name": "caffeine-js core (import { caffeine })",
+    "name": "@skj48817/caffeine-js core (import { caffeine })",
     "path": "dist/index.mjs",
     "import": "{ caffeine }",
     "limit": "8 kB"
   },
   {
-    "name": "caffeine-js/estimate (import { estimateBytes })",
+    "name": "@skj48817/caffeine-js/estimate (import { estimateBytes })",
     "path": "dist/estimate.mjs",
     "import": "{ estimateBytes }",
     "limit": "3 kB"
   },
   {
-    "name": "caffeine-js/react (import { useCachedValue })",
+    "name": "@skj48817/caffeine-js/react (import { useCachedValue })",
     "path": "dist/react.mjs",
     "import": "{ useCachedValue }",
     "limit": "2 kB"
   },
   {
-    "name": "caffeine-js/inspect (import { attachInspector })",
+    "name": "@skj48817/caffeine-js/inspect (import { attachInspector })",
     "path": "dist/inspect.mjs",
     "import": "{ attachInspector }",
     "limit": "3 kB"
   },
   {
-    "name": "caffeine-js/dashboard (import { renderDashboard })",
+    "name": "@skj48817/caffeine-js/dashboard (import { renderDashboard })",
     "path": "dist/dashboard.mjs",
     "import": "{ renderDashboard }",
     "limit": "4 kB"

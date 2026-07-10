@@ -1,5 +1,5 @@
 {
-  "name": "caffeine-js",
+  "name": "@skj48817/caffeine-js",
   "version": "1.0.0",
   "description": "High-performance isomorphic in-memory cache for JavaScript/TypeScript, implementing the Window-TinyLFU admission policy. Beats LRU/LFU hit ratios. Zero dependencies. Works in Node, browsers, Deno, Bun, and edge runtimes.",
   "type": "module",

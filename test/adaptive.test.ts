@@ -10,14 +10,8 @@ function lcg(seed: number): () => number {
   };
 }
 
-function hitRate(
-  trace: Int32Array,
-  cap: number,
-  adaptive: boolean,
-): number {
-  const c = caffeine<number, number>({ maximumSize: cap, adaptive })
-    .recordStats()
-    .build();
+function hitRate(trace: Int32Array, cap: number, adaptive: boolean): number {
+  const c = caffeine<number, number>({ maximumSize: cap, adaptive }).recordStats().build();
   for (let i = 0; i < trace.length; i++) {
     const k = trace[i] as number;
     if (c.get(k) === undefined) c.set(k, k);

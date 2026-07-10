@@ -34,9 +34,7 @@ describe("cache core", () => {
   });
 
   it("peek does not affect stats or recency", () => {
-    const c = caffeine<string, number>({ maximumSize: 10 })
-      .recordStats()
-      .build();
+    const c = caffeine<string, number>({ maximumSize: 10 }).recordStats().build();
     c.set("k", 1);
     expect(c.peek("k")).toBe(1);
     expect(c.peek("nope")).toBeUndefined();
@@ -64,9 +62,7 @@ describe("cache core", () => {
   });
 
   it("tracks hit/miss statistics when enabled", () => {
-    const c = caffeine<string, number>({ maximumSize: 10 })
-      .recordStats()
-      .build();
+    const c = caffeine<string, number>({ maximumSize: 10 }).recordStats().build();
     c.set("a", 1);
     c.get("a");
     c.get("a");
@@ -95,23 +91,25 @@ describe("cache core", () => {
     c.set("b", 2);
     expect(new Set(c.keys())).toEqual(new Set(["a", "b"]));
     expect(new Set(c.values())).toEqual(new Set([1, 2]));
-    expect(new Set(c.entries())).toEqual(new Set([["a", 1], ["b", 2]] as [string, number][]));
+    expect(new Set(c.entries())).toEqual(
+      new Set([
+        ["a", 1],
+        ["b", 2],
+      ] as [string, number][]),
+    );
   });
 
   it("protects frequently-read entries from eviction (batched reads)", () => {
-    // With deferred read maintenance, buffered hits must still influence
-    // admission: a hot key read many times should survive a flood of one-shot
-    // insertions, whereas a never-read key must not.
     const cap = 100;
     const c = caffeine<number, number>({ maximumSize: cap }).build();
-    c.set(-1, -1); // hot key
-    c.set(-2, -2); // cold key (never read again)
+    c.set(-1, -1);
+    c.set(-2, -2);
     for (let round = 0; round < 1000; round++) {
-      for (let r = 0; r < 20; r++) c.get(-1); // many reads → buffered
-      c.set(1000 + round, round); // churn forces eviction + drains buffer
+      for (let r = 0; r < 20; r++) c.get(-1);
+      c.set(1000 + round, round);
     }
-    expect(c.get(-1)).toBe(-1); // hot survivor
-    expect(c.get(-2)).toBeUndefined(); // cold evictee
+    expect(c.get(-1)).toBe(-1);
+    expect(c.get(-2)).toBeUndefined();
   });
 
   it("stays consistent across interleaved reads, writes and deletes", () => {
@@ -132,10 +130,38 @@ describe("cache core", () => {
       }
       expect(c.size).toBeLessThanOrEqual(cap);
     }
-    // Every key still resident must return the last value written for it.
     for (const [k, v] of model) {
       const got = c.get(k);
       if (got !== undefined) expect(got).toBe(v);
     }
+  });
+
+  it("rejects invalid size bounds", () => {
+    for (const maximumSize of [0, -1, 1.5, Number.POSITIVE_INFINITY, Number.NaN]) {
+      expect(() => caffeine<string, number>({ maximumSize }).build()).toThrow(/maximumSize/);
+    }
+  });
+
+  it("keeps removal delivery consistent across listener errors and re-entry", () => {
+    const events: Array<[string, number, string]> = [];
+    let setFromListener = (_key: string, _value: number): void => {};
+    const c = caffeine<string, number>({ maximumSize: 4 })
+      .removalListener((key, value, cause) => {
+        events.push([key, value, cause]);
+        if (key === "a") {
+          setFromListener("from-listener", 1);
+          throw new Error("listener failure");
+        }
+      })
+      .build();
+    setFromListener = (key, value) => c.set(key, value);
+
+    c.set("a", 1);
+    expect(c.delete("a")).toBe(true);
+    expect(c.get("from-listener")).toBe(1);
+    c.set("from-listener", 2);
+
+    expect(events).toContainEqual(["a", 1, "explicit"]);
+    expect(events).toContainEqual(["from-listener", 1, "replaced"]);
   });
 });

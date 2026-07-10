@@ -70,12 +70,12 @@ for databases, search, and web caches) while staying close to LRU on pure-recenc
 
 ## Comparison to popular npm caches
 
-| Library          | Policy          | Scan-resistant | Frequency-aware | TTL | Weights | Async loader | Isomorphic |
-| ---------------- | --------------- | -------------- | --------------- | --- | ------- | ------------ | ---------- |
-| **caffeine-js**  | **W-TinyLFU**   | ✅              | ✅               | ✅   | ✅       | ✅            | ✅          |
-| `lru-cache`      | LRU             | ❌              | ❌               | ✅   | ✅       | ✅ (fetch)    | ✅          |
-| `quick-lru`      | LRU (2-segment) | partial        | ❌               | ✅   | ❌       | ❌            | ✅          |
-| `mnemonist` LRU  | LRU/LFU         | ❌              | partial         | ❌   | ❌       | ❌            | ✅          |
+| Library         | Policy          | Scan-resistant | Frequency-aware | TTL | Weights | Async loader | Isomorphic |
+| --------------- | --------------- | -------------- | --------------- | --- | ------- | ------------ | ---------- |
+| **caffeine-js** | **W-TinyLFU**   | ✅             | ✅              | ✅  | ✅      | ✅           | ✅         |
+| `lru-cache`     | LRU             | ❌             | ❌              | ✅  | ✅      | ✅ (fetch)   | ✅         |
+| `quick-lru`     | LRU (2-segment) | partial        | ❌              | ✅  | ❌      | ❌           | ✅         |
+| `mnemonist` LRU | LRU/LFU         | ❌             | partial         | ❌  | ❌      | ❌           | ✅         |
 
 See [`README.md`](../README.md) for the API and quickstart, and the `examples/` directory
 for runnable snippets.

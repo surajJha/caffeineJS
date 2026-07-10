@@ -105,9 +105,7 @@ export class CaffeineAsyncCache<K, V> implements AsyncLoadingCache<K, V> {
     if (active) return active;
     const started = now();
     const controller =
-      this.useSignal && typeof AbortController !== "undefined"
-        ? new AbortController()
-        : undefined;
+      this.useSignal && typeof AbortController !== "undefined" ? new AbortController() : undefined;
     let raw: Promise<V>;
     try {
       raw = Promise.resolve(this.loader(key, controller?.signal));
@@ -149,6 +147,7 @@ export class CaffeineAsyncCache<K, V> implements AsyncLoadingCache<K, V> {
   invalidateAll(keys?: Iterable<K>): void {
     if (keys === undefined) {
       for (const k of [...this.inFlight.keys()]) this.abortInFlight(k);
+      this.refreshing.clear();
     } else {
       for (const k of keys) this.abortInFlight(k);
     }

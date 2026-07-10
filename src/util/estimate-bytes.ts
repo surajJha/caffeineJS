@@ -23,9 +23,7 @@ const MAX_DEPTH = 6;
 
 /** Estimates the combined byte size of a key and value, plus fixed overhead. */
 export function estimateBytes(key: unknown, value: unknown): number {
-  return (
-    ENTRY_OVERHEAD_BYTES + sizeOf(key, 0, new Set()) + sizeOf(value, 0, new Set())
-  );
+  return ENTRY_OVERHEAD_BYTES + sizeOf(key, 0, new Set()) + sizeOf(value, 0, new Set());
 }
 
 /** Estimates the byte size of a single JavaScript value. */

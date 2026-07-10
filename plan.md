@@ -32,22 +32,28 @@
 ## 2. Milestones
 
 ### M0: Foundation — Repo, tooling, contracts
+
 Shippable increment: an empty-but-installable package with types, build, CI, and a no-op cache stub.
 
 ### M1: Core Policy — W-TinyLFU engine
+
 Shippable increment: a fully working bounded cache (`get`/`set`/`has`/`delete`) using W-TinyLFU with count bounds.
 
 ### M2: Capabilities — TTL, weights, stats, listeners, async loader
+
 Shippable increment: feature-complete synchronous + async loading cache with observability.
 
 ### M3: Isomorphic + DX — Cross-runtime, React adapter, docs, benchmarks
+
 Shippable increment: published-quality package validated across runtimes with docs and perf proof.
 
 ### M4: Hardening — Efficiency validation, fuzzing, release
+
 Shippable increment: v1.0.0 release with proven hit-ratio parity and CI-gated quality.
 
 ### M5: Observability & Visualization — Instrumentation, CLI/TUI, web dashboard
-Shippable increment: opt-in event tap feeding a live CLI inspector and a web dashboard so users can *see* admission, promotion, and eviction happening in real time. (Can ship post-1.0 as a companion; depends only on the core event tap.)
+
+Shippable increment: opt-in event tap feeding a live CLI inspector and a web dashboard so users can _see_ admission, promotion, and eviction happening in real time. (Can ship post-1.0 as a companion; depends only on the core event tap.)
 
 ---
 
@@ -80,6 +86,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 ### M0 — Foundation
 
 #### CAFF-001 Bootstrap repository & package manifest — ✅ DONE
+
 - **Type**: Chore | **Priority**: P0 | **Size**: S | **Depends On**: None
 - **Files**: `package.json`, `.gitignore`, `.editorconfig`, `README.md`, `LICENSE`
 - **Acceptance Criteria**:
@@ -89,23 +96,26 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Use `exports` conditional map for ESM/CJS/types. Keep `dependencies: {}`.
 
 #### CAFF-002 TypeScript + build pipeline (ESM/CJS/UMD + d.ts) — ✅ DONE
+
 - **Type**: Chore | **Priority**: P0 | **Size**: M | **Depends On**: CAFF-001
 - **Files**: `tsconfig.json`, `tsup.config.ts`, `src/index.ts`
 - **Acceptance Criteria**:
-  - [ ] `npm run build` emits `dist/index.mjs`, `dist/index.cjs`, `dist/index.global.js`, `dist/index.d.ts`.
-  - [ ] `strict: true`; `target: ES2020` or lower for broad browser support.
-  - [ ] `are-the-types-wrong` (`attw`) passes; `publint` passes.
+  - [x] `npm run build` emits `dist/index.mjs`, `dist/index.cjs`, `dist/index.global.js`, `dist/index.d.ts`.
+  - [x] `strict: true`; `target: ES2020` or lower for broad browser support.
+  - [x] `are-the-types-wrong` (`attw`) passes; `publint` passes.
 - **Implementation Notes**: Use `tsup` (esbuild) for multi-format bundling. UMD/global name `CaffeineJS`.
 
 #### CAFF-003 Test runner, lint, format, coverage — ✅ DONE
+
 - **Type**: Chore | **Priority**: P0 | **Size**: S | **Depends On**: CAFF-001
 - **Files**: `vitest.config.ts`, `eslint.config.js`, `.prettierrc`, `package.json` scripts
 - **Acceptance Criteria**:
-  - [ ] `npm test`, `npm run lint`, `npm run format:check`, `npm run coverage` all wired.
-  - [ ] Coverage provider configured (v8) with thresholds placeholder.
+  - [x] `npm test`, `npm run lint`, `npm run format:check`, `npm run coverage` all wired.
+  - [x] Coverage provider configured (v8) with thresholds (statements 85%, branches 80%, functions 80%, lines 85%).
 - **Implementation Notes**: Vitest runs in both `node` and `jsdom`/`happy-dom` environments.
 
 #### CAFF-004 Public API contract & type surface (interfaces only) — ✅ DONE
+
 - **Type**: Spike | **Priority**: P0 | **Size**: S | **Depends On**: CAFF-002
 - **Files**: `src/types.ts`, `src/index.ts`
 - **Acceptance Criteria**:
@@ -115,6 +125,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Mirror Caffeine's builder ergonomics but idiomatic JS (options object + fluent builder). No implementation yet.
 
 #### CAFF-005 CI pipeline (GitHub Actions) — ✅ DONE
+
 - **Type**: Chore | **Priority**: P1 | **Size**: S | **Depends On**: CAFF-002, CAFF-003
 - **Files**: `.github/workflows/ci.yml`
 - **Acceptance Criteria**:
@@ -127,6 +138,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 ### M1 — Core Policy (W-TinyLFU engine)
 
 #### CAFF-009 Storage-layout perf gate (SoA prototype) — ✅ DONE
+
 - **Type**: Spike | **Priority**: P0 | **Size**: M | **Depends On**: CAFF-004
 - **Files**: `bench/storage-proto/*`, `src/store/soa-store.ts` (skeleton)
 - **Acceptance Criteria**:
@@ -137,6 +149,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: This de-risks the #1 scale concern before CAFF-012/013/014. If SoA underperforms for a key-type mix, document why and adjust before proceeding.
 
 #### CAFF-010 Frequency sketch — Count-Min Sketch (4-bit counters) — ✅ DONE
+
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-004
 - **Files**: `src/policy/frequency-sketch.ts`, `test/frequency-sketch.test.ts`
 - **Acceptance Criteria**:
@@ -145,9 +158,10 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [ ] `frequency(hash)` returns min of the 4 counters.
   - [ ] **Aging/reset**: after `sampleSize` (~10× capacity) increments, halve all counters (`>>>1`) and preserve reset residual.
   - [ ] Deterministic unit tests validate saturation, min-estimate, and reset behavior.
-- **Implementation Notes**: Port the *algorithm/idea* from Caffeine's `FrequencySketch`, re-implemented in idiomatic TS. Use a good hash spreader (e.g. mix like `xmur3`/`fmix32`). **Use Caffeine's block/bit-sliced layout**: keep a key's 4 counters within one 64-byte block for typed-array locality (start with classic 4-row CMS, then migrate).
+- **Implementation Notes**: Port the _algorithm/idea_ from Caffeine's `FrequencySketch`, re-implemented in idiomatic TS. Use a good hash spreader (e.g. mix like `xmur3`/`fmix32`). **Use Caffeine's block/bit-sliced layout**: keep a key's 4 counters within one 64-byte block for typed-array locality (start with classic 4-row CMS, then migrate).
 
 #### CAFF-011 Hashing & key coercion strategy — ✅ DONE
+
 - **Type**: Feature | **Priority**: P0 | **Size**: M | **Depends On**: CAFF-004
 - **Files**: `src/util/hash.ts`, `test/hash.test.ts`
 - **Acceptance Criteria**:
@@ -157,6 +171,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: `Map` handles equality/lookup; sketch only needs a 32-bit hash. Use `WeakMap<object, id>` counter for object keys.
 
 #### CAFF-012 SLRU main region (probation + protected) on unified SoA — ✅ DONE
+
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-004, CAFF-009
 - **Files**: `src/store/soa-store.ts`, `src/policy/slru.ts`, `test/slru.test.ts`
 - **Acceptance Criteria**:
@@ -167,6 +182,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Single index space + sentinel head slots per queue (see §2b). Movement between segments is DLL unlink + relink + `segment[idx]` update. Prior art: `isaacs/lru-cache`, `mnemonist`, `velo-org/velo` (per-segment SoA — we unify).
 
 #### CAFF-013 Admission window (LRU) + TinyLFU admission gate — ✅ DONE
+
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-010, CAFF-012
 - **Files**: `src/policy/window-tinylfu.ts`, `test/window-tinylfu.test.ts`
 - **Acceptance Criteria**:
@@ -179,6 +195,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: This is the heart of W-TinyLFU. Keep window/main sizing configurable for the adaptive step in CAFF-041. Admission gate consults the doorkeeper (CAFF-016) before the CMS.
 
 #### CAFF-016 Doorkeeper bloom filter (one-hit-wonder guard) — ✅ DONE
+
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-010
 - **Files**: `src/policy/doorkeeper.ts`, `src/policy/window-tinylfu.ts`, `test/doorkeeper.test.ts`
 - **Acceptance Criteria**:
@@ -189,6 +206,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: `Uint32Array` bitset, k hash functions. Effective frequency = `doorkeeper.contains(h) ? 1 : 0) + cms.frequency(h)`. Reset alongside CMS aging.
 
 #### CAFF-014 Bounded cache core (get/set/has/delete/clear/size) — ✅ DONE
+
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-013, CAFF-011
 - **Files**: `src/cache.ts`, `src/builder.ts`, `src/index.ts`, `test/cache.test.ts`
 - **Acceptance Criteria**:
@@ -199,6 +217,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Wire `Map<K, index>` + SoA store (CAFF-012) + policy. All mutations funnel through policy hooks (`onAdd`/`onAccess`/`onUpdate`/`onRemove`). Iterators are weakly-consistent; removal listeners fire strictly post-commit (see §2b).
 
 #### CAFF-015 Correctness invariants & property tests — ✅ DONE
+
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-014
 - **Files**: `test/invariants.test.ts`
 - **Acceptance Criteria**:
@@ -207,6 +226,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: `fast-check` as devDependency only. **M1 smoke test**: random workload keeps `size <= maximumSize` and hit ratio > naive FIFO.
 
 #### CAFF-017 Batched policy maintenance (read/write ring buffers) — ✅ DONE
+
 - **Type**: Feature | **Priority**: P2 | **Size**: M | **Depends On**: CAFF-014
 - **Files**: `src/policy/window-tinylfu.ts`, `src/cache.ts`, `test/cache.test.ts`
 - **Acceptance Criteria**:
@@ -214,7 +234,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [x] Consecutive hits on the same slot are coalesced (buffer holds a hot index at most once in a row), collapsing repeated hot-key reads. No generation tokens needed — reads never free slots, so buffered indices stay live until the next drain.
   - [x] Throughput on the hot-key workload improved **4.46M → ~6.2M ops/s** (bench-asserted; clears the 5M gate). Hit ratio unchanged at 0.905.
   - [x] Correctness invariants (CAFF-015) still hold; added targeted tests: hot-read survivor vs cold evictee, and interleaved read/write/delete consistency vs a model map.
-- **Implementation Notes**: Single-thread JS, so this is a *churn/throughput* optimization, not a locking mechanism. Also added an "already-MRU" short-circuit in the reorder path. Deferred the read buffer inside `WindowTinyLfu` (`readBuffer: Int32Array`, `onAccessBuffered`/`drainRead`/`applyAccess`).
+- **Implementation Notes**: Single-thread JS, so this is a _churn/throughput_ optimization, not a locking mechanism. Also added an "already-MRU" short-circuit in the reorder path. Deferred the read buffer inside `WindowTinyLfu` (`readBuffer: Int32Array`, `onAccessBuffered`/`drainRead`/`applyAccess`).
 
 ---
 
@@ -229,31 +249,35 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 > the SoA store became **growable** (sentinels relocated to fixed low indices)
 > for weight/byte-bounded caches.
 >
-> **v1 boundaries / deferred:** CAFF-021 variable per-entry expiry deferred;
-> TTL is not combined with `maximumWeight` in v1 (throws — growable expiry
-> arrays deferred); `asMap()` returns a snapshot rather than a live proxy view;
-> negative caching for async failures deferred (CAFF-028 decision log).
+> **v1 boundaries / deferred:** TTL is not combined with `maximumWeight` in v1
+> (throws — growable expiry arrays deferred); `asMap()` returns a snapshot rather
+> than a live proxy view; negative caching for async failures deferred (CAFF-028
+> decision log).
 
 #### CAFF-020 TTL: expire-after-write & expire-after-access — ✅ DONE
+
 - **Type**: Feature | **Priority**: P1 | **Size**: L | **Depends On**: CAFF-014
 - **Files**: `src/policy/expiry.ts`, `src/cache.ts`, `test/expiry.test.ts`
 - **Acceptance Criteria**:
-  - [ ] `expireAfterWrite(ms)` and `expireAfterAccess(ms)` options supported.
-  - [ ] Lazy expiration on access + O(1) amortized reclamation via a **5-level hierarchical timer wheel** (Moka/Caffeine layout), advanced on mutation/maintenance — **no reliance on `setInterval`**.
-  - [ ] Injectable clock (`options.clock`) for deterministic tests (no real timers).
-  - [ ] Expired entries fire removal listener with cause `EXPIRED`.
-  - [ ] Cleanup is budgeted (bounded entries reclaimed per op); `runMaintenance()` exposed for edge runtimes; optional auto-timer only on Node/Bun/Deno via capability detection.
+  - [x] `expireAfterWrite(ms)` and `expireAfterAccess(ms)` options supported.
+  - [x] Lazy expiration on access + O(1) amortized reclamation via a **5-level hierarchical timer wheel** (Moka/Caffeine layout), advanced on mutation/maintenance — **no reliance on `setInterval`**.
+  - [x] Injectable clock (`options.clock`) for deterministic tests (no real timers).
+  - [x] Expired entries fire removal listener with cause `EXPIRED`.
+  - [x] Cleanup is budgeted (bounded entries reclaimed per op); `runMaintenance()` exposed for edge runtimes; optional auto-timer only on Node/Bun/Deno via capability detection.
 - **Implementation Notes**: Timer-wheel buckets are SoA deques (`timerNext`/`timerPrev: UintArray`). Access-order TTL updates ride the batched-maintenance pipeline (CAFF-017) so hits stay cheap. Portable design per §2b (CF Workers timers only fire in-request; `Date.now()` doesn't advance during CPU).
 
-#### CAFF-021 Variable expiry (per-entry `Expiry` calculator)
+#### CAFF-021 Variable expiry (per-entry `Expiry` calculator) — ✅ DONE
+
 - **Type**: Feature | **Priority**: P2 | **Size**: M | **Depends On**: CAFF-020
-- **Files**: `src/policy/expiry.ts`, `test/expiry-variable.test.ts`
+- **Files**: `src/policy/expiry.ts`, `src/builder.ts`, `src/types.ts`, `test/expiry-variable.test.ts`
 - **Acceptance Criteria**:
-  - [ ] `expireAfter(expiry)` with `create/update/read` hooks returning per-entry TTL.
-  - [ ] Falls back to a hierarchical timer wheel for O(1) scheduling.
-- **Implementation Notes**: Optional; mirrors Caffeine `Expiry`. Keep behind capability flag.
+  - [x] `expireAfter(expiry)` with `create/update/read` hooks returning per-entry TTL.
+  - [x] Uses the same hierarchical timer wheel for O(1) scheduling.
+  - [x] Mutually exclusive with global `expireAfterWrite`/`expireAfterAccess`.
+- **Implementation Notes**: Mirrors Caffeine's `Expiry`. Per-entry durations are clamped to a safe range; `Infinity` means non-expiring. Read-hook updates extend/shorten TTL on access.
 
 #### CAFF-022 Weighted entries (`maximumWeight` + `Weigher`) — ✅ DONE
+
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-014
 - **Files**: `src/cache.ts`, `src/builder.ts`, `test/weight.test.ts`
 - **Acceptance Criteria**:
@@ -263,6 +287,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: `maximumSize` and `maximumWeight` are mutually exclusive (validate in builder).
 
 #### CAFF-027 Byte-based bounding & memory estimator — ✅ DONE
+
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-022
 - **Files**: `src/util/estimate-bytes.ts`, `src/builder.ts`, `test/estimate-bytes.test.ts`
 - **Acceptance Criteria**:
@@ -273,6 +298,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: This is the honest answer to "bound the cache to 1 GB." Estimator lives in a subpath (split Node vs browser) so it tree-shakes out when unused. See Appendix C for capacity math.
 
 #### CAFF-028 Production ergonomics — explicit accept/defer decisions
+
 - **Type**: Spike | **Priority**: P2 | **Size**: S | **Depends On**: CAFF-025
 - **Files**: `docs/decisions.md`, `src/builder.ts`
 - **Acceptance Criteria**:
@@ -281,6 +307,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Prevents silent scope creep and surfaces decisions the review flagged as undecided. Cheap now, expensive later.
 
 #### CAFF-023 Statistics & metrics — ✅ DONE
+
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-014
 - **Files**: `src/stats.ts`, `test/stats.test.ts`
 - **Acceptance Criteria**:
@@ -289,6 +316,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Provide a `StatsCounter` interface with `Disabled` (no-op) and `Concurrent`/`Counting` impls.
 
 #### CAFF-024 Removal & eviction listeners — ✅ DONE
+
 - **Type**: Feature | **Priority**: P1 | **Size**: S | **Depends On**: CAFF-014
 - **Files**: `src/cache.ts`, `test/listeners.test.ts`
 - **Acceptance Criteria**:
@@ -297,6 +325,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: `RemovalCause` enum-like union type. Never invoke callbacks mid-mutation (re-entrancy hazard — a listener may call `set`/`delete`/`clear`).
 
 #### CAFF-025 Async loading cache (`getOrLoad`, coalescing, `refresh`) — ✅ DONE
+
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-014, CAFF-023
 - **Files**: `src/async-cache.ts`, `test/async-cache.test.ts`
 - **Acceptance Criteria**:
@@ -309,6 +338,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Track pending loads with a per-key generation token, not just "store the promise as value". Stampede protection comes from sharing the in-flight promise; correctness comes from the token check on settle.
 
 #### CAFF-026 Utility methods (getIfPresent, putAll, invalidate, invalidateAll, asMap view) — ✅ DONE
+
 - **Type**: Feature | **Priority**: P2 | **Size**: S | **Depends On**: CAFF-014
 - **Files**: `src/cache.ts`, `test/api-surface.test.ts`
 - **Acceptance Criteria**:
@@ -325,6 +355,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 > perf gate 5.94M/s hot-get preserved, build emits `./`, `./estimate`, `./react` subpaths.
 
 #### CAFF-030 Cross-runtime abstraction (clock, timers, no Node built-ins) — ✅ DONE
+
 - **Type**: Chore | **Priority**: P0 | **Size**: M | **Depends On**: CAFF-020
 - **Files**: `src/env.ts`, `test/env.test.ts`
 - **Acceptance Criteria**:
@@ -334,6 +365,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Keep the core pure; environment concerns isolated in one module.
 
 #### CAFF-031 Multi-runtime CI (browser, Deno, Bun, Workers) — ✅ DONE
+
 - **Type**: Chore | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-030, CAFF-005
 - **Files**: `.github/workflows/ci.yml`, `test/browser/*`, `scripts/smoke-*.{js,ts}`
 - **Acceptance Criteria**:
@@ -343,6 +375,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Smoke, not full-suite, on exotic runtimes to keep CI fast.
 
 #### CAFF-032 React adapter (`@caffeine-js/react` or subpath export) — ✅ DONE
+
 - **Type**: Feature | **Priority**: P2 | **Size**: M | **Depends On**: CAFF-025
 - **Files**: `src/react/useCache.ts`, `src/react/index.ts`, `test/react.test.tsx`
 - **Acceptance Criteria**:
@@ -352,6 +385,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Thin wrapper only — core stays framework-agnostic. Consider `useSyncExternalStore`.
 
 #### CAFF-033 Documentation site & API reference — ✅ DONE
+
 - **Type**: Chore | **Priority**: P1 | **Size**: L | **Depends On**: CAFF-026
 - **Files**: `README.md`, `docs/**`, `typedoc.json`
 - **Acceptance Criteria**:
@@ -361,6 +395,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Keep examples in `examples/` and lint them so they never rot.
 
 #### CAFF-034 Benchmark harness — ✅ DONE
+
 - **Type**: Feature | **Priority**: P1 | **Size**: L | **Depends On**: CAFF-014
 - **Files**: `bench/throughput.ts`, `bench/hit-ratio.ts`, `bench/traces/*`
 - **Acceptance Criteria**:
@@ -375,6 +410,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 ### M4 — Hardening & Release
 
 #### CAFF-040 Efficiency validation vs Caffeine claims — ✅ DONE
+
 - **Type**: Feature | **Priority**: P0 | **Size**: L | **Depends On**: CAFF-034, CAFF-015
 - **Files**: `test/efficiency.test.ts`, `bench/hit-ratio.ts`
 - **Acceptance Criteria**:
@@ -383,6 +419,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: This ticket proves Success Criterion #1. If parity fails, revisit CAFF-010/013 tuning (sample size, admission tie-break).
 
 #### CAFF-041 Adaptive window sizing (hill-climbing) — default-on — ✅ DONE
+
 - **Type**: Feature | **Priority**: P1 | **Size**: XL | **Depends On**: CAFF-040
 - **Files**: `src/policy/window-tinylfu.ts`, `src/cache.ts`, `src/types.ts`, `src/builder.ts`, `test/adaptive.test.ts`, `bench/adaptive.ts`
 - **Acceptance Criteria**:
@@ -390,9 +427,10 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [x] Bounded exploration cost on stable frequency-skewed traces: within ~0.1–0.6pp of static and converging tighter over time (a first-sample **warmup** avoids the `previousHitRate=0` jerk). Large gains on recency/dynamic traces: **+26pp (short trace) to +55pp (converged)** on a sliding-hot-set workload, window auto-grows toward ~70–98%.
   - [x] **On by default** (`options.adaptive: true` / `.adaptive(false)` to disable for a fixed ~1% window and deterministic behavior).
   - [x] No throughput regression: perf gate still 6.2M/s hot-get (climb runs once per ~10M accesses).
-- **Implementation Notes**: Faithful to Caffeine's climb (restart threshold 0.05, step-percent 0.0625, decay 0.9) plus a warmup sample and a noise-tolerant resize that rebalances protected/window overflow into probation without evicting (total capacity unchanged). Validation harness: `bench/adaptive.ts` (zipfian skew 2/3 + recency-shift). **Reality check** (rubber-duck): an absolute "never regresses" guarantee is unachievable for any online noisy hill-climber on a flat surface; the realistic guarantee is *bounded sub-1pp exploration cost on stable traces, large gains on dynamic ones*, which the validation confirms.
+- **Implementation Notes**: Faithful to Caffeine's climb (restart threshold 0.05, step-percent 0.0625, decay 0.9) plus a warmup sample and a noise-tolerant resize that rebalances protected/window overflow into probation without evicting (total capacity unchanged). Validation harness: `bench/adaptive.ts` (zipfian skew 2/3 + recency-shift). **Reality check** (rubber-duck): an absolute "never regresses" guarantee is unachievable for any online noisy hill-climber on a flat surface; the realistic guarantee is _bounded sub-1pp exploration cost on stable traces, large gains on dynamic ones_, which the validation confirms.
 
 #### CAFF-042 Fuzz & stress testing — ✅ DONE
+
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-015
 - **Files**: `test/fuzz.test.ts`
 - **Acceptance Criteria**:
@@ -401,6 +439,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Extend fast-check model-based testing against a reference oracle map.
 
 #### CAFF-043 Bundle size budget & tree-shaking verification — ✅ DONE
+
 - **Type**: Chore | **Priority**: P1 | **Size**: S | **Depends On**: CAFF-002
 - **Files**: `.size-limit.json`, `.github/workflows/ci.yml`
 - **Acceptance Criteria**:
@@ -409,6 +448,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Uses `@size-limit/preset-small-lib` with per-subpath `import` entries. Actual sizes: core 6.12 kB, estimate 350 B, react 215 B, inspect 1.95 kB.
 
 #### CAFF-044 Release automation & versioning — ✅ DONE
+
 - **Type**: Chore | **Priority**: P0 | **Size**: S | **Depends On**: CAFF-031, CAFF-033, CAFF-040, CAFF-043
 - **Files**: `.github/workflows/release.yml`, `CHANGELOG.md`, `.changeset/*`, `package.json`
 - **Acceptance Criteria**:
@@ -423,6 +463,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 ### M5 — Observability & Visualization
 
 #### CAFF-050 Instrumentation event tap (zero-overhead when off) — ✅ DONE
+
 - **Type**: Feature | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-014, CAFF-023
 - **Files**: `src/inspect/events.ts`, `src/cache.ts`, `test/events.test.ts`
 - **Acceptance Criteria**:
@@ -434,6 +475,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - Demo script: `node --import tsx scripts/demo-cli.mjs`.
 
 #### CAFF-051 CLI/TUI live inspector — ✅ DONE
+
 - **Type**: Feature | **Priority**: P2 | **Size**: L | **Depends On**: CAFF-050
 - **Files**: `src/inspect/cli/*`, `bin/caffeine-inspect.ts`, `test/cli.test.ts`
 - **Acceptance Criteria**:
@@ -443,6 +485,7 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
 - **Implementation Notes**: Use `ink` (React-for-CLI) or `blessed`. Node-only; ships as an optional subpath/bin so it never bloats the core browser bundle. Primary audience: backend/prod debugging over SSH.
 
 #### CAFF-052 Web dashboard (real-time visualization) — ✅ DONE (v1)
+
 - **Type**: Feature | **Priority**: P2 | **Size**: XL | **Depends On**: CAFF-050
 - **Files**: `src/dashboard/index.ts`, `src/dashboard/browser.ts`, `src/dashboard/server.ts`, `test/dashboard-browser.test.ts`, `test/dashboard-server.test.ts`
 - **Acceptance Criteria**:
@@ -450,10 +493,9 @@ These decisions supersede earlier notes where they conflict. Sources verified ag
   - [x] Live event log shows hits, misses, admits, rejects, promotes, demotes, evicts, and resizes in real time.
   - [x] Two transports: in-browser (`renderDashboard(container, cache)`) and Node (`serveDashboard(cache)` via SSE).
   - [x] Backpressure-safe SSE: per-client bounded buffer drops oldest events when the client cannot keep up; `sampleRate` observer option throttles event volume.
-  - [ ] Time-series charts and frequency heatmap (deferred to v1.1 dashboard polish).
-- **Implementation Notes**: v1 focuses on the core "see the policy work" experience. Uses the same `CacheObserver` event stream as the CLI inspector. Browser and server are separate subpath exports so Node built-ins don't leak into browser bundles.
+  - [x] v1.1 additions: time-series charts (hit-rate, size, evictions/sec) and a 64-cell frequency heatmap in both browser and server UIs.
+- **Implementation Notes**: v1 focuses on the core "see the policy work" experience; v1.1 adds lightweight `<canvas>` charts and a frequency heatmap. Uses the same `CacheObserver` event stream as the CLI inspector. Browser and server are separate subpath exports so Node built-ins don't leak into browser bundles.
   - Demo script: `node --import tsx scripts/demo-dashboard.mjs` (serves on `http://localhost:8765` by default).
-
 
 ---
 
@@ -495,20 +537,20 @@ Parallelizable within M1: CAFF-010, CAFF-011, CAFF-012 (and CAFF-016 after 010) 
 
 ## 5. Risk Register
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Hit ratio doesn't beat LRU (policy bug) | Med | High | CAFF-040 gates release; deterministic sketch tests (CAFF-010); tie-break + sample-size tuning knobs. |
-| Perf below target due to GC/object churn | Med | High | Intrusive lists + reused node objects; typed-array sketch; bench early (CAFF-034). |
-| Node-only APIs leak into bundle, break browser/edge | Med | High | CAFF-030 isolates env; multi-runtime CI (CAFF-031); no `node:*` lint rule. |
-| Timer-wheel complexity for variable expiry | Med | Med | Ship write/access-order lists first (CAFF-020); variable expiry (CAFF-021) is P2/optional. |
-| Async coalescing races / promise leaks on rejection | Med | High | Explicit pending-entry cleanup on reject; concurrency tests with spies (CAFF-025). |
-| Adaptive hill-climbing regresses hit ratio | Low | Med | Feature-flagged (CAFF-041); guard asserts no regression vs static window. |
-| API churn breaks early adopters | Low | Med | Freeze contract in CAFF-004; changesets + semver (CAFF-044). |
-| Object-key hashing id map grows unbounded | Low | Med | Use `WeakMap` for object→id so ids are GC'd with keys. |
-| Byte-based bound is only approximate (JS can't size objects) | High | Med | Document clearly; ship estimator + optional `process.memoryUsage()` safety valve (CAFF-027); recommend explicit weigher. |
-| Event tap taxes the hot path | Med | High | Single-boolean gate, zero cost when off; sampling; never emit values by default (CAFF-050). |
-| Web dashboard floods socket on hot cache | Med | Med | Server-side batching/sampling + backpressure (CAFF-052). |
-| Doorkeeper reset drifts out of sync with sketch aging | Low | Med | Reset bloom in the same aging pass as the CMS; unit-test the lockstep (CAFF-016). |
+| Risk                                                         | Likelihood | Impact | Mitigation                                                                                                               |
+| ------------------------------------------------------------ | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Hit ratio doesn't beat LRU (policy bug)                      | Med        | High   | CAFF-040 gates release; deterministic sketch tests (CAFF-010); tie-break + sample-size tuning knobs.                     |
+| Perf below target due to GC/object churn                     | Med        | High   | Intrusive lists + reused node objects; typed-array sketch; bench early (CAFF-034).                                       |
+| Node-only APIs leak into bundle, break browser/edge          | Med        | High   | CAFF-030 isolates env; multi-runtime CI (CAFF-031); no `node:*` lint rule.                                               |
+| Timer-wheel complexity for variable expiry                   | Med        | Med    | Ship write/access-order lists first (CAFF-020); variable expiry (CAFF-021) is P2/optional.                               |
+| Async coalescing races / promise leaks on rejection          | Med        | High   | Explicit pending-entry cleanup on reject; concurrency tests with spies (CAFF-025).                                       |
+| Adaptive hill-climbing regresses hit ratio                   | Low        | Med    | Feature-flagged (CAFF-041); guard asserts no regression vs static window.                                                |
+| API churn breaks early adopters                              | Low        | Med    | Freeze contract in CAFF-004; changesets + semver (CAFF-044).                                                             |
+| Object-key hashing id map grows unbounded                    | Low        | Med    | Use `WeakMap` for object→id so ids are GC'd with keys.                                                                   |
+| Byte-based bound is only approximate (JS can't size objects) | High       | Med    | Document clearly; ship estimator + optional `process.memoryUsage()` safety valve (CAFF-027); recommend explicit weigher. |
+| Event tap taxes the hot path                                 | Med        | High   | Single-boolean gate, zero cost when off; sampling; never emit values by default (CAFF-050).                              |
+| Web dashboard floods socket on hot cache                     | Med        | Med    | Server-side batching/sampling + backpressure (CAFF-052).                                                                 |
+| Doorkeeper reset drifts out of sync with sketch aging        | Low        | Med    | Reset bloom in the same aging pass as the CMS; unit-test the lockstep (CAFF-016).                                        |
 
 ---
 
@@ -529,15 +571,13 @@ Parallelizable within M1: CAFF-010, CAFF-011, CAFF-012 (and CAFF-016 after 010) 
 
 ## 7. Remaining Work (post-v1.0)
 
-Functional:
-- **CAFF-021 Variable expiry** — per-entry `Expiry` calculator (`expireAfter` create/update/read hooks) instead of a single global TTL.
-- **Dashboard v1.1** — time-series charts (hit rate, size, eviction rate) and a frequency heatmap.
+All planned v1.0 work is complete. Possible future enhancements:
 
-Tooling / packaging gaps:
-- Add lint (`eslint`) and format (`prettier` or `dprint`) scripts to CAFF-003.
-- Add `publint` and `are-the-types-wrong` checks to CI.
-- Emit a UMD/global build (`dist/index.global.js`) for CAFF-002.
-- Configure coverage thresholds in CI.
+- **Dashboard v1.2** — exportable snapshots, pause/resume live feed, per-key inspection.
+- **TTL + `maximumWeight`** — growable timer-wheel arrays so expiry and weight bounding can be combined.
+- **Off-heap / shared-memory experiments** — `SharedArrayBuffer` policy state for worker clusters (research only).
+- **Benchmark suite** — add Node 22, Deno 2, Bun 1.1, and browser matrix to CI.
+- **Typedoc-generated docs site** — publish to GitHub Pages.
 
 ---
 
@@ -568,6 +608,7 @@ Tooling / packaging gaps:
 ```
 
 Key data structures:
+
 - **`Map<K, Node>`** — O(1) lookup, arbitrary key types.
 - **Intrusive doubly-linked lists** — window, probation, protected, (write-order, access-order for TTL).
 - **`Uint32Array` Count-Min Sketch** — 4-bit saturating counters, halve-on-aging every ~10× capacity increments.
@@ -586,14 +627,15 @@ const cache = caffeine<string, User>({ maximumSize: 10_000 })
   .build();
 
 cache.set("u1", user);
-cache.get("u1");            // User | undefined
-cache.stats();             // { hitRate, evictionCount, ... }
+cache.get("u1"); // User | undefined
+cache.stats(); // { hitRate, evictionCount, ... }
 
 // Async loading cache (stampede-safe)
-const loading = caffeine<string, User>({ maximumSize: 10_000 })
-  .buildAsync(async (id) => fetchUser(id));
+const loading = caffeine<string, User>({ maximumSize: 10_000 }).buildAsync(async (id) =>
+  fetchUser(id),
+);
 
-await loading.get("u1");   // Promise<User>, coalesced
+await loading.get("u1"); // Promise<User>, coalesced
 
 // React
 import { useCachedValue } from "caffeine-js/react";
@@ -608,25 +650,26 @@ Bound by explicit **weight (bytes)** via a weigher + estimator (CAFF-027), with 
 
 Rough per-entry fixed overhead in V8 (excluding the stored value):
 
-| Component | ~Bytes |
-|-----------|--------|
-| `Node` object (~9 fields) | ~110 |
-| V8 `Map` slot | ~60 |
-| Key string (~20 chars) | ~50 |
-| CMS sketch share (per entry) | ~0.5 |
-| **Fixed overhead / entry** | **~220** |
+| Component                    | ~Bytes   |
+| ---------------------------- | -------- |
+| `Node` object (~9 fields)    | ~110     |
+| V8 `Map` slot                | ~60      |
+| Key string (~20 chars)       | ~50      |
+| CMS sketch share (per entry) | ~0.5     |
+| **Fixed overhead / entry**   | **~220** |
 
 Items that fit in **1 GB** (overhead + value):
 
-| Value size | Bytes/entry | Items in 1 GB |
-|-----------|-------------|---------------|
-| tiny (number / short string ~50 B) | ~270 B | **~4,000,000** |
-| small object (~500 B) | ~720 B | **~1,500,000** |
-| ~1 KB JSON | ~1.25 KB | **~850,000** |
-| ~10 KB | ~10.2 KB | **~100,000** |
-| ~100 KB blob | ~100 KB | **~10,000** |
+| Value size                         | Bytes/entry | Items in 1 GB  |
+| ---------------------------------- | ----------- | -------------- |
+| tiny (number / short string ~50 B) | ~270 B      | **~4,000,000** |
+| small object (~500 B)              | ~720 B      | **~1,500,000** |
+| ~1 KB JSON                         | ~1.25 KB    | **~850,000**   |
+| ~10 KB                             | ~10.2 KB    | **~100,000**   |
+| ~100 KB blob                       | ~100 KB     | **~10,000**    |
 
 Caveats:
+
 - Node old-space default (~2 GB) — a 1 GB cache needs `--max-old-space-size` headroom or GC pauses appear near the ceiling.
 - Browsers expose no heap API → estimates are best-effort only.
 - The CMS/doorkeeper cost is negligible (~0.5 B/entry; ~5 MB for 10 M entries).
@@ -635,33 +678,84 @@ Caveats:
 
 ## Appendix D — Known W-TinyLFU weaknesses & our mitigations
 
-| Weakness of textbook W-TinyLFU | Our mitigation (ticket) |
-|--------------------------------|-------------------------|
-| Static 1% window underperforms on recency-skewed workloads | Adaptive hill-climbing window, default-on (CAFF-041) |
-| CMS hash collisions inflate frequency → wrong admissions | Doorkeeper bloom filter fronts the CMS (CAFF-016) |
-| Global halving (aging) is coarse; slow to adapt to shifts | Tuned sample size + doorkeeper; adaptive window reacts faster |
-| Scattered CMS counters hurt memory locality | Block/bit-sliced sketch layout (CAFF-010) |
-| Hot-key list-move churn wastes cycles | Batched policy maintenance via ring buffer (CAFF-017) |
-| Weighted caches ignore item cost/size in admission | Future spike: cost-aware (GDSF-style) admission for weighted mode |
-| Caffeine's lock-free concurrency machinery is complex | Dropped — single-threaded JS; ring buffers kept only for churn, not locking |
-| Object-per-node layout balloons GC/heap at scale in V8 | Unified Structure-of-Arrays store (§2b, CAFF-009/012) |
+| Weakness of textbook W-TinyLFU                             | Our mitigation (ticket)                                                     |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Static 1% window underperforms on recency-skewed workloads | Adaptive hill-climbing window, default-on (CAFF-041)                        |
+| CMS hash collisions inflate frequency → wrong admissions   | Doorkeeper bloom filter fronts the CMS (CAFF-016)                           |
+| Global halving (aging) is coarse; slow to adapt to shifts  | Tuned sample size + doorkeeper; adaptive window reacts faster               |
+| Scattered CMS counters hurt memory locality                | Block/bit-sliced sketch layout (CAFF-010)                                   |
+| Hot-key list-move churn wastes cycles                      | Batched policy maintenance via ring buffer (CAFF-017)                       |
+| Weighted caches ignore item cost/size in admission         | Future spike: cost-aware (GDSF-style) admission for weighted mode           |
+| Caffeine's lock-free concurrency machinery is complex      | Dropped — single-threaded JS; ring buffers kept only for churn, not locking |
+| Object-per-node layout balloons GC/heap at scale in V8     | Unified Structure-of-Arrays store (§2b, CAFF-009/012)                       |
 
 ## Appendix E — At-scale reference implementations & lessons (source-verified)
 
 We benchmarked our design against proven at-scale caches, not just Java Caffeine. Key transferable ideas and citations:
 
-| Source | Idea we adopt | Reference |
-|--------|---------------|-----------|
-| **isaacs/lru-cache** (JS) | SoA typed-array pointers; `getUintArray(max)` (Uint8/16/32 by 2^8/2^16/2^32); typed-array free-list `Stack`; full preallocation at construct time; `node:diagnostics_channel` for observability | `src/index.ts:60-108, 1296-1513` |
-| **mnemonist** (JS) | SoA `forward`/`backward` pointer arrays for LRU; confirms the pattern | `lru-cache.js:36-56` |
-| **velo-org/velo** (TS) | Only existing TS W-TinyLFU — correct sketch/segment sizing (window 1%, protected 80%); reference for CMS `Uint8Array(width*depth)`, reset at `width*10`. Gaps: plain-object keys, no TTL, no weights, unmaintained | `src/policy/tiny_lfu/*` |
-| **dgraph/Ristretto** (Go) | Doorkeeper bloom + 4-bit CMS; **sampled-LFU eviction (sample of 5)**; lossy read-batch buffers | `policy.go`, `ring.go`, `sketch.go` |
-| **moka / mini-moka** (Rust) | Flush buffers at **64 ops**; throttle maintenance to **300ms**, cap a run at **100ms**; **5-level timer wheel** (165 buckets) for TTL; entry generation for ABA/stale-slot detection | `common/concurrent/constants.rs`, `timer_wheel.rs`, `housekeeper.rs` |
-| **V8 internals** | `Map` cap ≈153M (`OrderedHashMap::MaxCapacity`); short-string/int keys are fastest; memory is the real ceiling | `objects/ordered-hash-table.h:205-209` |
-| **Edge runtimes** | Timers only fire in-request on CF Workers; `Date.now()` frozen during CPU; 128 MB/isolate → lazy expiry + `runMaintenance()`, no `setInterval` reliance | CF Workers limits/web-standards docs |
+| Source                      | Idea we adopt                                                                                                                                                                                                      | Reference                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| **isaacs/lru-cache** (JS)   | SoA typed-array pointers; `getUintArray(max)` (Uint8/16/32 by 2^8/2^16/2^32); typed-array free-list `Stack`; full preallocation at construct time; `node:diagnostics_channel` for observability                    | `src/index.ts:60-108, 1296-1513`                                     |
+| **mnemonist** (JS)          | SoA `forward`/`backward` pointer arrays for LRU; confirms the pattern                                                                                                                                              | `lru-cache.js:36-56`                                                 |
+| **velo-org/velo** (TS)      | Only existing TS W-TinyLFU — correct sketch/segment sizing (window 1%, protected 80%); reference for CMS `Uint8Array(width*depth)`, reset at `width*10`. Gaps: plain-object keys, no TTL, no weights, unmaintained | `src/policy/tiny_lfu/*`                                              |
+| **dgraph/Ristretto** (Go)   | Doorkeeper bloom + 4-bit CMS; **sampled-LFU eviction (sample of 5)**; lossy read-batch buffers                                                                                                                     | `policy.go`, `ring.go`, `sketch.go`                                  |
+| **moka / mini-moka** (Rust) | Flush buffers at **64 ops**; throttle maintenance to **300ms**, cap a run at **100ms**; **5-level timer wheel** (165 buckets) for TTL; entry generation for ABA/stale-slot detection                               | `common/concurrent/constants.rs`, `timer_wheel.rs`, `housekeeper.rs` |
+| **V8 internals**            | `Map` cap ≈153M (`OrderedHashMap::MaxCapacity`); short-string/int keys are fastest; memory is the real ceiling                                                                                                     | `objects/ordered-hash-table.h:205-209`                               |
+| **Edge runtimes**           | Timers only fire in-request on CF Workers; `Date.now()` frozen during CPU; 128 MB/isolate → lazy expiry + `runMaintenance()`, no `setInterval` reliance                                                            | CF Workers limits/web-standards docs                                 |
 
 **Ecosystem gap confirmed:** no maintained, production-grade W-TinyLFU cache exists on npm (searches for `w-tinylfu`/`tinylfu` returned no standalone published library). Combined with the novel unified-SoA-across-segments layout, this library fills a real gap.
 
 **What does NOT transfer from Java/Go/Rust:** store sharding, `sync.Pool`/goroutine pinning, background maintenance threads, `Arc`/reference counting, lock-free CAS — all artifacts of multi-threaded runtimes. Single-threaded JS does maintenance inline/deferred via the batched pipeline.
 
+---
 
+## 6. Production-Readiness Refactor (post-v1.0 polish)
+
+> Performed after all M0–M5 tickets shipped. Goal: remove dead code, strip
+> unnecessary / AI-generated comments, consolidate repeated patterns, and make
+> the library feel production-grade.
+
+### M6 — Cleanup, agent docs, and final validation
+
+#### CAFF-060 Create `agents.md` contributor guide
+
+- **Type**: Chore | **Priority**: P1 | **Size**: S | **Depends On**: None
+- **Files**: `agents.md`
+- **Acceptance Criteria**:
+  - [x] Crisp guide covering architecture, conventions, testing, release, and common pitfalls.
+  - [x] New agents can onboard without reading the whole plan.
+
+#### CAFF-061 Core source audit & dead-code removal
+
+- **Type**: Chore | **Priority**: P1 | **Size**: M | **Depends On**: CAFF-060
+- **Files**: `src/policy/expiry.ts`, `src/policy/window-tinylfu.ts`, `src/policy/frequency-sketch.ts`, `src/cache.ts`
+- **Acceptance Criteria**:
+  - [x] Unused fields removed (`ExpiryPolicy.createdAt`, `ExpiryPolicy.usesAccessTtl`).
+  - [x] Import order fixed (`import type` at top of `expiry.ts`).
+  - [x] Redundant inline comments removed; only "why" comments retained.
+  - [x] Public API surface completed: `Expiry` exported from `src/index.ts`.
+
+#### CAFF-062 Inspector/dashboard cleanup
+
+- **Type**: Chore | **Priority**: P2 | **Size**: S | **Depends On**: CAFF-061
+- **Files**: `src/inspect/cli.ts`, `src/inspect/events.ts`, `src/inspect/aggregator.ts`, `src/dashboard/browser.ts`, `src/dashboard/server.ts`, `src/inspect/bin.ts`
+- **Acceptance Criteria**:
+  - [x] Inline closures simplified, verbose header comments trimmed.
+  - [x] CLI binary keeps running until SIGINT.
+  - [x] No behavioral change; existing tests still pass.
+
+#### CAFF-063 Final validation
+
+- **Type**: Chore | **Priority**: P0 | **Size**: S | **Depends On**: CAFF-061, CAFF-062
+- **Files**: `package.json`, tooling configs
+- **Acceptance Criteria**:
+  - [x] `npm run typecheck && npm run lint && npm run format:check && npm test && npm run build && npm run size && npm run pack:audit && npm run smoke:node` passes.
+  - [x] 111 tests green, coverage thresholds met, publint + attw clean.
+
+---
+
+## 7. Current Status
+
+- All M0–M5 tickets are implemented and validated.
+- M6 production-readiness refactor is complete.
+- The library is ready for v1.0.0 publication.

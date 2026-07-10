@@ -21,34 +21,64 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./estimate": {
-      "types": "./dist/estimate.d.ts",
-      "import": "./dist/estimate.mjs",
-      "require": "./dist/estimate.cjs"
+      "import": {
+        "types": "./dist/estimate.d.ts",
+        "default": "./dist/estimate.mjs"
+      },
+      "require": {
+        "types": "./dist/estimate.d.cts",
+        "default": "./dist/estimate.cjs"
+      }
     },
     "./react": {
-      "types": "./dist/react.d.ts",
-      "import": "./dist/react.mjs",
-      "require": "./dist/react.cjs"
+      "import": {
+        "types": "./dist/react.d.ts",
+        "default": "./dist/react.mjs"
+      },
+      "require": {
+        "types": "./dist/react.d.cts",
+        "default": "./dist/react.cjs"
+      }
     },
     "./inspect": {
-      "types": "./dist/inspect.d.ts",
-      "import": "./dist/inspect.mjs",
-      "require": "./dist/inspect.cjs"
+      "import": {
+        "types": "./dist/inspect.d.ts",
+        "default": "./dist/inspect.mjs"
+      },
+      "require": {
+        "types": "./dist/inspect.d.cts",
+        "default": "./dist/inspect.cjs"
+      }
     },
     "./dashboard": {
-      "types": "./dist/dashboard.d.ts",
-      "import": "./dist/dashboard.mjs",
-      "require": "./dist/dashboard.cjs"
+      "import": {
+        "types": "./dist/dashboard.d.ts",
+        "default": "./dist/dashboard.mjs"
+      },
+      "require": {
+        "types": "./dist/dashboard.d.cts",
+        "default": "./dist/dashboard.cjs"
+      }
     },
     "./dashboard/server": {
-      "types": "./dist/dashboard/server.d.ts",
-      "import": "./dist/dashboard/server.mjs",
-      "require": "./dist/dashboard/server.cjs"
+      "import": {
+        "types": "./dist/dashboard/server.d.ts",
+        "default": "./dist/dashboard/server.mjs"
+      },
+      "require": {
+        "types": "./dist/dashboard/server.d.cts",
+        "default": "./dist/dashboard/server.cjs"
+      }
     }
   },
   "bin": {
@@ -57,6 +87,8 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "unpkg": "./dist/index.global.js",
+  "jsdelivr": "./dist/index.global.js",
   "files": [
     "dist",
     "README.md",
@@ -70,6 +102,10 @@
       "optional": true
     }
   },
+  "overrides": {
+    "esbuild": "0.28.1",
+    "vite": "6.4.3"
+  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
@@ -81,26 +117,35 @@
     "bench:throughput": "node --expose-gc --import tsx bench/throughput.ts",
     "bench:hitratio": "tsx bench/hit-ratio.ts",
     "docs:api": "typedoc",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "size": "size-limit",
     "release": "npm publish --provenance --access public",
-    "pack:audit": "npm pack --dry-run",
+    "pack:audit": "npm run build && publint && attw --pack . --ignore-rules no-resolution && npm pack --dry-run",
     "smoke:node": "node scripts/smoke-node.mjs",
     "smoke:worker": "node scripts/smoke-worker.test.mjs",
     "smoke:browser": "node scripts/smoke-browser.mjs",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.4",
     "@changesets/cli": "^2.31.0",
+    "@eslint/js": "^10.0.1",
     "@size-limit/preset-small-lib": "^12.1.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitest/coverage-v8": "^2.1.8",
+    "@vitest/coverage-v8": "^3.2.6",
+    "eslint": "^10.6.0",
     "fast-check": "^3.23.1",
+    "globals": "^17.7.0",
     "jsdom": "^29.1.1",
     "lru-cache": "^11.5.2",
+    "prettier": "^3.9.4",
+    "publint": "^0.3.21",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "size-limit": "^12.1.0",
@@ -108,6 +153,7 @@
     "tsx": "^4.19.2",
     "typedoc": "^0.27.6",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "typescript-eslint": "^8.63.0",
+    "vitest": "^3.2.6"
   }
 }

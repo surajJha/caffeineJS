@@ -4,10 +4,7 @@
  * fewer bytes per pointer means less memory and better cache locality.
  */
 export type UintArray = Uint8Array | Uint16Array | Uint32Array;
-export type UintArrayCtor =
-  | Uint8ArrayConstructor
-  | Uint16ArrayConstructor
-  | Uint32ArrayConstructor;
+export type UintArrayCtor = Uint8ArrayConstructor | Uint16ArrayConstructor | Uint32ArrayConstructor;
 
 export function getUintArrayCtor(max: number): UintArrayCtor {
   if (max <= 0x100) return Uint8Array;

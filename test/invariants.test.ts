@@ -64,9 +64,7 @@ describe("hit-ratio quality", () => {
     // Skewed key generator: many hits concentrate on low ids.
     const nextKey = () => Math.floor(universe * Math.pow(Math.random(), 3));
 
-    const wtiny = caffeine<number, number>({ maximumSize: cap })
-      .recordStats()
-      .build();
+    const wtiny = caffeine<number, number>({ maximumSize: cap }).recordStats().build();
 
     // Reference FIFO cache.
     const fifo = new Map<number, number>();

@@ -22,7 +22,7 @@ const HTML = `<!doctype html>
   <title>caffeine-js dashboard</title>
   <style>
     body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:24px;display:flex;justify-content:center}
-    #root{width:min(720px,100%)}
+    #root{width:min(900px,100%)}
     .caffeine-dashboard{font-size:13px;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px}
     .caffeine-dashboard h3{margin:0 0 10px;font-size:15px;color:#58a6ff}
     .caffeine-metrics{display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap}
@@ -39,6 +39,12 @@ const HTML = `<!doctype html>
     .caffeine-gate{display:flex;justify-content:center;align-items:center;height:34px;border:1px dashed #484f58;border-radius:6px;margin-bottom:12px;color:#8b949e;font-size:12px;transition:all .2s}
     .caffeine-gate.admit{background:#12261e;color:#56d364;border-color:#238636}
     .caffeine-gate.reject{background:#2a1619;color:#f85149;border-color:#da3633}
+    .caffeine-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px}
+    .caffeine-chart{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:8px}
+    .caffeine-chart canvas{width:100%;height:80px}
+    .caffeine-chart h4{margin:0 0 6px;font-size:11px;text-transform:uppercase;opacity:.7}
+    .caffeine-heatmap{display:grid;grid-template-columns:repeat(16,1fr);gap:2px;margin-top:6px}
+    .caffeine-heatmap .cell{aspect-ratio:1;border-radius:2px;background:#21262d}
     .caffeine-log{max-height:240px;overflow:auto;background:#161b22;border-radius:6px;padding:6px}
     .caffeine-log ul{list-style:none;margin:0;padding:0}
     .caffeine-log li{font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;padding:2px 0;border-bottom:1px solid #21262d}
@@ -61,15 +67,85 @@ const HTML = `<!doctype html>
         <div class="row protected"><label>protected</label><div class="bar"><div class="fill"></div><div class="text"></div></div></div>
       </div>
       <div class="caffeine-gate">connecting…</div>
+      <div class="caffeine-charts">
+        <div class="caffeine-chart"><h4>hit-rate %</h4><canvas class="hit-rate-chart"></canvas></div>
+        <div class="caffeine-chart"><h4>size</h4><canvas class="size-chart"></canvas></div>
+        <div class="caffeine-chart"><h4>evictions / sec</h4><canvas class="evict-chart"></canvas></div>
+        <div class="caffeine-chart"><h4>frequency heatmap</h4><div class="caffeine-heatmap"></div></div>
+      </div>
       <div class="caffeine-log"><ul></ul></div>
     </div>
   </div>
   <script>
+    const HISTORY_POINTS = 120;
+    const HISTORY_EVERY_MS = 500;
     const $ = (s) => document.querySelector(s);
     const fills = { window: $('.row.window .fill'), probation: $('.row.probation .fill'), protected: $('.row.protected .fill') };
     const gate = $('.caffeine-gate');
     const log = $('.caffeine-log ul');
-    let ops = 0, hits = 0, gateTimer;
+    const heatmap = $('.caffeine-heatmap');
+    for (let i = 0; i < 64; i++) { const c = document.createElement('div'); c.className = 'cell'; heatmap.appendChild(c); }
+    const charts = { hitRate: $('.hit-rate-chart'), size: $('.size-chart'), evict: $('.evict-chart') };
+    let ops = 0, hits = 0, evicts = 0, evictsSinceCheck = 0, lastEvictCheck = performance.now(), gateTimer;
+    let lastOccupancy = { weightedSize: 0 };
+    const freqBuckets = new Array(64).fill(0);
+
+    class HistoryBuffer {
+      constructor(n) { this.data = new Float64Array(n); this.w = 0; this.c = 0; this.n = n; }
+      push(v) { this.data[this.w] = v; this.w = (this.w + 1) % this.n; if (this.c < this.n) this.c++; }
+      snapshot() { const out = []; for (let i = 0; i < this.c; i++) { const idx = (this.w - this.c + i + this.n) % this.n; out.push(this.data[idx]); } return out; }
+    }
+    const hitRateHistory = new HistoryBuffer(HISTORY_POINTS);
+    const sizeHistory = new HistoryBuffer(HISTORY_POINTS);
+    const evictHistory = new HistoryBuffer(HISTORY_POINTS);
+
+    function drawLine(canvas, values, opts = {}) {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      ctx.scale(dpr, dpr);
+      const w = rect.width, h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+      if (values.length < 2) return;
+      const lo = opts.min || 0;
+      const hi = opts.max || Math.max(...values, 1);
+      const range = hi - lo || 1;
+      ctx.beginPath();
+      ctx.strokeStyle = opts.color || '#58a6ff';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < values.length; i++) {
+        const x = (i / (values.length - 1)) * w;
+        const y = h - ((values[i] - lo) / range) * h;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    function updateHeatmap() {
+      const cells = heatmap.children;
+      const max = Math.max(1, ...freqBuckets);
+      for (let i = 0; i < cells.length; i++) {
+        const intensity = freqBuckets[i] / max;
+        const hue = 120 + (1 - intensity) * 240;
+        cells[i].style.backgroundColor = 'hsla(' + hue + ',80%,50%,' + (0.2 + intensity * 0.8) + ')';
+      }
+    }
+
+    function sampleHistory() {
+      hitRateHistory.push((hits / Math.max(1, ops)) * 100);
+      sizeHistory.push(lastOccupancy.weightedSize || 0);
+      const now = performance.now();
+      const secs = (now - lastEvictCheck) / 1000;
+      evictHistory.push(Math.round(evictsSinceCheck / Math.max(0.001, secs)));
+      evictsSinceCheck = 0;
+      lastEvictCheck = now;
+      drawLine(charts.hitRate, hitRateHistory.snapshot(), { min: 0, max: 100, color: '#79c0ff' });
+      drawLine(charts.size, sizeHistory.snapshot(), { color: '#56d364' });
+      drawLine(charts.evict, evictHistory.snapshot(), { color: '#f85149' });
+    }
 
     function setBar(name, value, total, max) {
       const pct = Math.min(100, Math.round((value / Math.max(1, total)) * 100));
@@ -80,6 +156,9 @@ const HTML = `<!doctype html>
     function render(event) {
       ops++;
       if (event.type === 'hit') hits++;
+      if (event.type === 'evict') { evicts++; evictsSinceCheck++; }
+      if (typeof event.freq === 'number') { freqBuckets[Math.min(63, event.freq)]++; updateHeatmap(); }
+      lastOccupancy = event.occupancy;
       $('.ops').textContent = ops;
       $('.hit-rate').textContent = ((hits / Math.max(1, ops)) * 100).toFixed(1) + '%';
       const o = event.occupancy;
@@ -108,7 +187,7 @@ const HTML = `<!doctype html>
 
     const es = new EventSource('/events');
     es.onmessage = (e) => { try { render(JSON.parse(e.data)); } catch {} };
-    es.onopen = () => { gate.className = 'caffeine-gate'; gate.textContent = 'admission gate idle'; };
+    es.onopen = () => { gate.className = 'caffeine-gate'; gate.textContent = 'admission gate idle'; sampleHistory(); setInterval(sampleHistory, HISTORY_EVERY_MS); };
     es.onerror = () => { gate.className = 'caffeine-gate reject'; gate.textContent = 'event source error'; };
   </script>
 </body>

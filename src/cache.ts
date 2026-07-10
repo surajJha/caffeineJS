@@ -21,7 +21,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
   private readonly policy: WindowTinyLfu<K, V>;
   private readonly listener?: RemovalListener<K, V>;
   private readonly statsEnabled: boolean;
-  private readonly expiry?: ExpiryPolicy;
+  private readonly expiry?: ExpiryPolicy<K, V>;
   private readonly weigher?: (key: K, value: V) => number;
   private readonly maxBound: number;
   private observer?: CacheObserver<K, V>;
@@ -34,11 +34,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
   private loadFailures = 0;
   private loadTime = 0;
 
-  /** Reused eviction sink to avoid per-op closures. */
   private readonly evictSink: (victim: number) => void;
-
-  /** Post-commit removal queue: records are drained only after cache state is
-   * fully consistent, so a listener that re-enters set/delete/clear is safe. */
   private readonly removals: { key: K; value: V; cause: RemovalCause }[] = [];
   private draining = false;
 
@@ -54,6 +50,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
       observer,
       expireAfterWrite,
       expireAfterAccess,
+      expireAfter,
       clock = wallClockNow,
     } = options;
     this.observer = observer;
@@ -61,18 +58,22 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
 
     const weighted = maximumWeight !== undefined;
     if (weighted === (maximumSize !== undefined)) {
-      throw new Error(
-        "specify exactly one of maximumSize or maximumWeight",
-      );
+      throw new Error("specify exactly one of maximumSize or maximumWeight");
     }
+    if (maximumSize !== undefined) validatePositiveInteger(maximumSize, "maximumSize");
+    if (maximumWeight !== undefined) validatePositiveNumber(maximumWeight, "maximumWeight");
+    if (expectedEntries !== undefined) validatePositiveInteger(expectedEntries, "expectedEntries");
     if (weighted && typeof weigher !== "function") {
       throw new Error("maximumWeight requires a weigher function");
     }
     const w0 = normalizeTtl(expireAfterWrite, "expireAfterWrite");
     const a0 = normalizeTtl(expireAfterAccess, "expireAfterAccess");
-    if (weighted && (w0 > 0 || a0 > 0)) {
+    if (expireAfter && (w0 > 0 || a0 > 0)) {
+      throw new Error("expireAfter is mutually exclusive with expireAfterWrite/expireAfterAccess");
+    }
+    if (weighted && (w0 > 0 || a0 > 0 || expireAfter)) {
       throw new Error(
-        "TTL (expireAfterWrite/Access) is not supported with maximumWeight in v1",
+        "TTL (expireAfterWrite/Access/expireAfter) is not supported with maximumWeight in v1",
       );
     }
 
@@ -92,22 +93,23 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
     } else {
       const size = maximumSize!;
       this.store = new SoaStore<K, V>(size + 1, false);
-      this.policy = new WindowTinyLfu<K, V>(
-        this.store,
-        doorkeeper,
-        adaptive,
-        size,
-        size,
-        observer,
-      );
+      this.policy = new WindowTinyLfu<K, V>(this.store, doorkeeper, adaptive, size, size, observer);
       this.maxBound = size;
     }
 
     this.listener = options.removalListener;
     this.statsEnabled = recordStats;
 
-    if (w0 > 0 || a0 > 0) {
-      this.expiry = new ExpiryPolicy(this.store.slotSpace, w0, a0, clock);
+    if (w0 > 0 || a0 > 0 || expireAfter) {
+      this.expiry = new ExpiryPolicy<K, V>(
+        this.store.slotSpace,
+        expireAfter,
+        w0,
+        a0,
+        clock,
+        (idx) => this.store.keyAt(idx),
+        (idx) => this.store.valueAt(idx),
+      );
     }
 
     this.evictSink = (victim: number) => {
@@ -259,8 +261,7 @@ export class CaffeineCache<K, V> implements Cache<K, V> {
     const idx = this.store.indexOf(key);
     if (idx === NIL) return false;
     const value = this.store.valueAt(idx);
-    const expired =
-      this.expiry !== undefined && this.expiry.isExpired(idx, this.expiry.now());
+    const expired = this.expiry !== undefined && this.expiry.isExpired(idx, this.expiry.now());
     const cause: RemovalCause = expired ? "expired" : "explicit";
     this.emitEvict(idx, cause);
     this.policy.onRemove(idx);
@@ -444,10 +445,21 @@ function normalizeTtl(value: number | undefined, name: string): number {
   return value;
 }
 
-/** Coerces a weigher result to a non-negative finite number. */
 function weight(w: number): number {
   if (!Number.isFinite(w) || w < 0) {
     throw new Error("weigher must return a non-negative finite number");
   }
   return w;
+}
+
+function validatePositiveInteger(value: number, name: string): void {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive safe integer`);
+  }
+}
+
+function validatePositiveNumber(value: number, name: string): void {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} must be a positive finite number`);
+  }
 }

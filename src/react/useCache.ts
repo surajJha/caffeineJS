@@ -23,10 +23,7 @@ export interface CachedValueState<V> {
  * @example
  * const { data, isLoading, error } = useCachedValue(userCache, userId);
  */
-export function useCachedValue<K, V>(
-  cache: AsyncLoadingCache<K, V>,
-  key: K,
-): CachedValueState<V> {
+export function useCachedValue<K, V>(cache: AsyncLoadingCache<K, V>, key: K): CachedValueState<V> {
   const cached = cache.getIfPresent(key);
   const [data, setData] = useState<V | undefined>(cached);
   const [isLoading, setIsLoading] = useState<boolean>(cached === undefined);
@@ -39,8 +36,7 @@ export function useCachedValue<K, V>(
   const load = useCallback(
     (loader: () => Promise<V>) => {
       const requestId = ++requestIdRef.current;
-      const isCurrent = () =>
-        mountedRef.current && requestIdRef.current === requestId;
+      const isCurrent = () => mountedRef.current && requestIdRef.current === requestId;
 
       const present = cache.getIfPresent(key);
       setData(present);

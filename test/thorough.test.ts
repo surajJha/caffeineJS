@@ -130,18 +130,22 @@ describe("thorough edge-case coverage", () => {
     expect(events1.length).toBe(count1); // obs1 detached
 
     cache.attachObserver!(undefined);
+    const count2 = events2.length;
     cache.set("e", 5);
-    expect(events2.length).toBe(events2.length); // no new events
+    expect(events2.length).toBe(count2);
   });
 
   it("observer sampleRate and include options work", () => {
     const cache = caffeine<string, number>({ maximumSize: 4 }).build();
     const events: Array<{ type: string; key?: string; value?: number }> = [];
-    const obs = new CacheObserver<string, number>((e) => events.push({ type: e.type, key: e.key, value: e.value }), {
-      sampleRate: 1,
-      includeKeys: false,
-      includeValues: false,
-    });
+    const obs = new CacheObserver<string, number>(
+      (e) => events.push({ type: e.type, key: e.key, value: e.value }),
+      {
+        sampleRate: 1,
+        includeKeys: false,
+        includeValues: false,
+      },
+    );
     cache.attachObserver!(obs);
     cache.set("a", 1);
     cache.get("a");
@@ -200,11 +204,13 @@ describe("thorough edge-case coverage", () => {
 
   it("async cache handles loader rejection and retry", async () => {
     let calls = 0;
-    const cache = caffeine<string, number>({ maximumSize: 4 }).recordStats().buildAsync(async () => {
-      calls++;
-      if (calls === 1) throw new Error("boom");
-      return calls;
-    });
+    const cache = caffeine<string, number>({ maximumSize: 4 })
+      .recordStats()
+      .buildAsync(async () => {
+        calls++;
+        if (calls === 1) throw new Error("boom");
+        return calls;
+      });
 
     await expect(cache.get("x")).rejects.toThrow("boom");
     const value = await cache.get("x");
@@ -215,11 +221,13 @@ describe("thorough edge-case coverage", () => {
 
   it("async cache coalesces concurrent loads", async () => {
     let calls = 0;
-    const cache = caffeine<string, number>({ maximumSize: 4 }).recordStats().buildAsync(async () => {
-      calls++;
-      await new Promise((r) => setTimeout(r, 50));
-      return calls;
-    });
+    const cache = caffeine<string, number>({ maximumSize: 4 })
+      .recordStats()
+      .buildAsync(async () => {
+        calls++;
+        await new Promise((r) => setTimeout(r, 50));
+        return calls;
+      });
 
     const [a, b] = await Promise.all([cache.get("x"), cache.get("x")]);
     expect(a).toBe(b);
@@ -228,7 +236,9 @@ describe("thorough edge-case coverage", () => {
 
   it("async cache refresh updates value", async () => {
     let value = 1;
-    const cache = caffeine<string, number>({ maximumSize: 4 }).recordStats().buildAsync(() => Promise.resolve(value));
+    const cache = caffeine<string, number>({ maximumSize: 4 })
+      .recordStats()
+      .buildAsync(() => Promise.resolve(value));
 
     expect(await cache.get("x")).toBe(1);
     value = 2;
@@ -237,7 +247,9 @@ describe("thorough edge-case coverage", () => {
   });
 
   it("bulkGet resolves partial results", async () => {
-    const cache = caffeine<string, number>({ maximumSize: 10 }).recordStats().buildAsync(async (k) => Number(k));
+    const cache = caffeine<string, number>({ maximumSize: 10 })
+      .recordStats()
+      .buildAsync(async (k) => Number(k));
 
     const map = await cache.bulkGet(["1", "2", "3"]);
     expect(map.get("1")).toBe(1);

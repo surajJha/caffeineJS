@@ -7,16 +7,13 @@
  */
 
 /** True when a high-resolution monotonic clock is available. */
-const HAS_PERF =
-  typeof performance !== "undefined" && typeof performance.now === "function";
+const HAS_PERF = typeof performance !== "undefined" && typeof performance.now === "function";
 
 /**
  * Monotonic-ish millisecond timestamp for measuring durations (loader timing,
  * benchmarks). Prefers `performance.now()`; falls back to `Date.now()`.
  */
-export const monotonicNow: () => number = HAS_PERF
-  ? () => performance.now()
-  : () => Date.now();
+export const monotonicNow: () => number = HAS_PERF ? () => performance.now() : () => Date.now();
 
 /**
  * Wall-clock millisecond timestamp, the default TTL clock. Always `Date.now`

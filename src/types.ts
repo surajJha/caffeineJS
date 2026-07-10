@@ -8,14 +8,25 @@ export type RemovalCause =
 /** Monotonic-ish millisecond clock. Injectable for deterministic tests. */
 export type Clock = () => number;
 
-export type RemovalListener<K, V> = (
-  key: K,
-  value: V,
-  cause: RemovalCause,
-) => void;
+export type RemovalListener<K, V> = (key: K, value: V, cause: RemovalCause) => void;
 
 /** Computes a positive integer weight for an entry (for weight-bounded caches). */
 export type Weigher<K, V> = (key: K, value: V) => number;
+
+/**
+ * Per-entry expiry calculator. Mirrors Caffeine's `Expiry`.
+ *
+ * Each hook returns the desired TTL in milliseconds from the current time.
+ * Returning `Infinity` means the entry never expires through this policy.
+ */
+export interface Expiry<K, V> {
+  /** TTL for a newly created entry. */
+  expireAfterCreate(key: K, value: V, currentTime: number): number;
+  /** TTL when an existing entry is overwritten. `currentDuration` is the remaining TTL before the update. */
+  expireAfterUpdate(key: K, value: V, currentTime: number, currentDuration: number): number;
+  /** TTL when an entry is read. `currentDuration` is the remaining TTL before the read. */
+  expireAfterRead(key: K, value: V, currentTime: number, currentDuration: number): number;
+}
 
 /** Snapshot of segment occupancy at the moment an event fires. */
 export interface Occupancy {
@@ -55,20 +66,8 @@ export interface CacheObserver<K, V> {
     freq: number;
     occupancy: Occupancy;
   }): void;
-  emitPromote(args: {
-    key: K;
-    value: V;
-    hash: number;
-    freq: number;
-    occupancy: Occupancy;
-  }): void;
-  emitDemote(args: {
-    key: K;
-    value: V;
-    hash: number;
-    freq: number;
-    occupancy: Occupancy;
-  }): void;
+  emitPromote(args: { key: K; value: V; hash: number; freq: number; occupancy: Occupancy }): void;
+  emitDemote(args: { key: K; value: V; hash: number; freq: number; occupancy: Occupancy }): void;
   emitEvict(args: {
     key: K;
     value: V;
@@ -78,20 +77,15 @@ export interface CacheObserver<K, V> {
     cause: RemovalCause;
     occupancy: Occupancy;
   }): void;
-  emitResize(args: {
-    windowMax: number;
-    protectedMax: number;
-    occupancy: Occupancy;
-  }): void;
+  emitResize(args: { windowMax: number; protectedMax: number; occupancy: Occupancy }): void;
   emitAge(args: { occupancy: Occupancy }): void;
 }
 
-/** Loads a value for a missing key. May be sync or async; receives an optional
- * AbortSignal that fires when the load is superseded/invalidated. */
-export type AsyncLoader<K, V> = (
-  key: K,
-  signal?: AbortSignal,
-) => Promise<V> | V;
+/**
+ * Loads a value for a missing key. May be sync or async; receives an optional
+ * AbortSignal that fires when the load is superseded/invalidated.
+ */
+export type AsyncLoader<K, V> = (key: K, signal?: AbortSignal) => Promise<V> | V;
 
 /** Loads many keys in one call, returning the resolved subset. */
 export type BulkLoader<K, V> = (
@@ -156,6 +150,11 @@ export interface CacheOptions<K, V> {
    */
   expireAfterAccess?: number;
   /**
+   * Per-entry expiry calculator. Mutually exclusive with `expireAfterWrite`
+   * and `expireAfterAccess`.
+   */
+  expireAfter?: Expiry<K, V>;
+  /**
    * Time source in milliseconds. Defaults to `Date.now`. Inject a fake clock
    * for deterministic TTL tests, or `performance.now` for a monotonic source.
    */
@@ -211,8 +210,10 @@ export interface Cache<K, V> {
 export interface AsyncCacheOptions<K, V> extends CacheOptions<K, V> {
   /** Loads a value for a missing key. */
   loader: AsyncLoader<K, V>;
-  /** Pass an AbortSignal to the loader, aborted when a load is superseded
-   * (default true where AbortController exists). */
+  /**
+   * Pass an AbortSignal to the loader, aborted when a load is superseded
+   * (default true where AbortController exists).
+   */
   useAbortSignal?: boolean;
 }
 

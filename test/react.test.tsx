@@ -4,13 +4,7 @@ import { render, screen, waitFor, act, cleanup } from "@testing-library/react";
 import { caffeine } from "../src/index.js";
 import { useCachedValue } from "../src/react/index.js";
 
-function View({
-  cache,
-  keyName,
-}: {
-  cache: ReturnType<typeof makeCache>;
-  keyName: string;
-}) {
+function View({ cache, keyName }: { cache: ReturnType<typeof makeCache>; keyName: string }) {
   const { data, isLoading, error } = useCachedValue(cache, keyName);
   if (error) return <div>error: {String(error)}</div>;
   if (isLoading) return <div>loading</div>;
@@ -18,9 +12,7 @@ function View({
 }
 
 function makeCache(loader: (k: string) => Promise<string>) {
-  return caffeine<string, string>({ maximumSize: 100 })
-    .recordStats()
-    .buildAsync(loader);
+  return caffeine<string, string>({ maximumSize: 100 }).recordStats().buildAsync(loader);
 }
 
 describe("useCachedValue", () => {
@@ -42,9 +34,7 @@ describe("useCachedValue", () => {
         <View cache={cache} keyName="x" />
       </>,
     );
-    await waitFor(() =>
-      expect(screen.getAllByText("data: v-x").length).toBe(3),
-    );
+    await waitFor(() => expect(screen.getAllByText("data: v-x").length).toBe(3));
     expect(loader).toHaveBeenCalledTimes(1);
     cleanup();
   });
@@ -54,17 +44,13 @@ describe("useCachedValue", () => {
       throw new Error("boom");
     });
     render(<View cache={cache} keyName="e" />);
-    await waitFor(() =>
-      expect(screen.getByText(/error: Error: boom/)).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText(/error: Error: boom/)).toBeTruthy());
     cleanup();
   });
 
   it("does not update state after unmount", async () => {
     let resolve!: (v: string) => void;
-    const cache = makeCache(
-      () => new Promise<string>((r) => (resolve = r)),
-    );
+    const cache = makeCache(() => new Promise<string>((r) => (resolve = r)));
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { unmount } = render(<View cache={cache} keyName="u" />);
     unmount();
@@ -72,9 +58,7 @@ describe("useCachedValue", () => {
       resolve("late");
       await Promise.resolve();
     });
-    expect(
-      errSpy.mock.calls.some((c) => String(c[0]).includes("unmounted")),
-    ).toBe(false);
+    expect(errSpy.mock.calls.some((c) => String(c[0]).includes("unmounted"))).toBe(false);
     errSpy.mockRestore();
   });
 });

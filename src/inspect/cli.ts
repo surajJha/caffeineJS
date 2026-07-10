@@ -18,12 +18,6 @@ export interface InspectorHandle {
   stop(): void;
 }
 
-/**
- * Attach a live terminal dashboard to a cache.
- *
- * In a TTY it redraws the screen; in non-TTY mode it prints a snapshot at the
- * configured interval.
- */
 export function attachInspector(
   cache: Cache<unknown, unknown>,
   options: InspectorOptions = {},
@@ -34,12 +28,11 @@ export function attachInspector(
     rollingWindow: options.rollingWindow,
   });
 
-  const cb = (event: CacheEvent<unknown, unknown>) => aggregator.ingest(event);
-  const observer = new CacheObserver<unknown, unknown>(cb, {
-    includeKeys: true,
-  });
+  const observer = new CacheObserver<unknown, unknown>(
+    (event: CacheEvent<unknown, unknown>) => aggregator.ingest(event),
+    { includeKeys: true },
+  );
 
-  // Attach at runtime; the cache must expose the internal attachObserver hook.
   const attachable = cache as unknown as {
     attachObserver?: (observer?: CacheObserver<unknown, unknown>) => void;
   };
@@ -51,25 +44,22 @@ export function attachInspector(
   attachable.attachObserver(observer);
 
   const isTTY =
-    typeof process !== "undefined" &&
-    process.stdout != null &&
-    process.stdout.isTTY === true;
+    typeof process !== "undefined" && process.stdout != null && process.stdout.isTTY === true;
 
   let stopped = false;
-  let timer: ReturnType<typeof setInterval> | undefined;
 
   const render = (): void => {
     const s = aggregator.snapshot();
     if (isTTY) {
       process.stdout.write("\x1b[2J\x1b[H" + renderDashboard(s));
     } else {
+      // eslint-disable-next-line no-console
       console.log(renderSnapshot(s));
     }
   };
 
   const onExit = (): void => {
     stop();
-    // eslint-disable-next-line n/no-process-exit
     process.exit(0);
   };
 
@@ -79,7 +69,7 @@ export function attachInspector(
     process.on("SIGTERM", onExit);
   }
 
-  timer = setInterval(render, refreshMs);
+  const timer = setInterval(render, refreshMs);
 
   const stop = (): void => {
     if (stopped) return;

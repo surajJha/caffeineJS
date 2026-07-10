@@ -6,7 +6,7 @@
 
 ## Why
 
-A plain LRU evicts the least *recently* used item, which throws away frequently-used entries during scans or bursts. **W-TinyLFU** keeps a compact frequency sketch and only admits a new entry if it is estimated to be more valuable than the one it would evict. On skewed (real-world) workloads this nearly triples the hit ratio versus LRU:
+A plain LRU evicts the least _recently_ used item, which throws away frequently-used entries during scans or bursts. **W-TinyLFU** keeps a compact frequency sketch and only admits a new entry if it is estimated to be more valuable than the one it would evict. On skewed (real-world) workloads this nearly triples the hit ratio versus LRU:
 
 ```
 capacity 1M, skewed stream 2M ops:  caffeine-js hit rate 0.905  vs  lru-cache 0.332
@@ -29,12 +29,12 @@ const cache = caffeine<string, number>({ maximumSize: 10_000 })
   .build();
 
 cache.set("a", 1);
-cache.get("a");     // 1
-cache.peek("a");    // 1 (no recency/stats update)
-cache.has("a");     // true
-cache.delete("a");  // true
-cache.size;         // number of entries
-cache.stats();      // { hitCount, missCount, hitRate, evictionCount, loadSuccessCount, loadFailureCount, totalLoadTime }
+cache.get("a"); // 1
+cache.peek("a"); // 1 (no recency/stats update)
+cache.has("a"); // true
+cache.delete("a"); // true
+cache.size; // number of entries
+cache.stats(); // { hitCount, missCount, hitRate, evictionCount, loadSuccessCount, loadFailureCount, totalLoadTime }
 ```
 
 ### TTL, weight bounding, and async loading
@@ -46,8 +46,8 @@ import { estimateBytes } from "caffeine-js/estimate";
 // Time-based expiry (injectable clock; no setInterval — lazy + timer wheel).
 const ttl = caffeine<string, string>({})
   .maximumSize(10_000)
-  .expireAfterWrite(60_000)   // 60s after last write
-  .expireAfterAccess(30_000)  // and/or 30s after last read
+  .expireAfterWrite(60_000) // 60s after last write
+  .expireAfterAccess(30_000) // and/or 30s after last read
   .build();
 
 // Approximate byte-bounded cache (~256 MiB): bound by weight, not count.
@@ -61,9 +61,8 @@ const loading = caffeine<string, User>({})
   .buildAsync(async (id, signal) => fetchUser(id, signal));
 
 const user = await loading.get("42"); // loads once even under concurrent misses
-await loading.refresh("42");          // serves old value until the reload lands
+await loading.refresh("42"); // serves old value until the reload lands
 ```
-
 
 Works with `require` too:
 
@@ -77,27 +76,27 @@ Any key type is supported, including objects (compared by reference, like `Map`)
 const byRef = caffeine<object, string>({ maximumSize: 100 }).build();
 const key = { id: 1 };
 byRef.set(key, "value");
-byRef.get(key);        // "value"
-byRef.get({ id: 1 });  // undefined — different object identity
+byRef.get(key); // "value"
+byRef.get({ id: 1 }); // undefined — different object identity
 ```
 
 ## API
 
 `caffeine(options)` returns a builder:
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `maximumSize` | `number` | — | Max entries before size-based eviction. Mutually exclusive with `maximumWeight`. |
-| `maximumWeight` | `number` | — | Max total weight before eviction. Requires `weigher`. |
-| `weigher` | `(key, value) => number` | — | Per-entry weight for weight-bounded caches. |
-| `expectedEntries` | `number` | `1024` | Steady-state entry-count hint for weight-bounded caches (sizes the sketch/store; the store grows past it). |
-| `expireAfterWrite` | `number` (ms) | — | Expire entries this long after their last write. |
-| `expireAfterAccess` | `number` (ms) | — | Expire entries this long after their last read/write. |
-| `clock` | `() => number` | `Date.now` | Injectable millisecond clock (deterministic tests, `performance.now`). |
-| `doorkeeper` | `boolean` | `true` | Bloom filter that keeps one-hit-wonders out of the frequency sketch. |
-| `adaptive` | `boolean` | `true` | Auto-tune the admission-window/main ratio via hill-climbing to maximize hit rate on the live workload. Disable for a fixed ~1% window and deterministic behavior. |
-| `recordStats` | `boolean` | `false` | Track hit/miss/eviction/load counts (near-zero overhead when off). |
-| `removalListener` | `(key, value, cause) => void` | — | Called after eviction/replacement/deletion/expiry. `cause` ∈ `"size" \| "replaced" \| "explicit" \| "expired"`. |
+| Option              | Type                          | Default    | Description                                                                                                                                                       |
+| ------------------- | ----------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maximumSize`       | `number`                      | —          | Max entries before size-based eviction. Mutually exclusive with `maximumWeight`.                                                                                  |
+| `maximumWeight`     | `number`                      | —          | Max total weight before eviction. Requires `weigher`.                                                                                                             |
+| `weigher`           | `(key, value) => number`      | —          | Per-entry weight for weight-bounded caches.                                                                                                                       |
+| `expectedEntries`   | `number`                      | `1024`     | Steady-state entry-count hint for weight-bounded caches (sizes the sketch/store; the store grows past it).                                                        |
+| `expireAfterWrite`  | `number` (ms)                 | —          | Expire entries this long after their last write.                                                                                                                  |
+| `expireAfterAccess` | `number` (ms)                 | —          | Expire entries this long after their last read/write.                                                                                                             |
+| `clock`             | `() => number`                | `Date.now` | Injectable millisecond clock (deterministic tests, `performance.now`).                                                                                            |
+| `doorkeeper`        | `boolean`                     | `true`     | Bloom filter that keeps one-hit-wonders out of the frequency sketch.                                                                                              |
+| `adaptive`          | `boolean`                     | `true`     | Auto-tune the admission-window/main ratio via hill-climbing to maximize hit rate on the live workload. Disable for a fixed ~1% window and deterministic behavior. |
+| `recordStats`       | `boolean`                     | `false`    | Track hit/miss/eviction/load counts (near-zero overhead when off).                                                                                                |
+| `removalListener`   | `(key, value, cause) => void` | —          | Called after eviction/replacement/deletion/expiry. `cause` ∈ `"size" \| "replaced" \| "explicit" \| "expired"`.                                                   |
 
 Builder methods mirror the options (`.maximumSize(n)`, `.maximumWeight(n, weigher)`, `.expectedEntries(n)`, `.expireAfterWrite(ms)`, `.expireAfterAccess(ms)`, `.clock(fn)`, `.recordStats()`, `.doorkeeper(bool)`, `.adaptive(bool)`, `.removalListener(fn)`) and return `this`; call `.build()` for a `Cache`, or `.buildAsync(loader)` for an `AsyncLoadingCache`.
 
@@ -142,9 +141,9 @@ The package is ESM-first and dependency-free, so it works directly via a bundler
 
 | Library         | Policy          | Scan-resistant | Frequency-aware | TTL | Weights | Async loader | Isomorphic |
 | --------------- | --------------- | -------------- | --------------- | --- | ------- | ------------ | ---------- |
-| **caffeine-js** | **W-TinyLFU**   | ✅              | ✅               | ✅   | ✅       | ✅            | ✅          |
-| `lru-cache`     | LRU             | ❌              | ❌               | ✅   | ✅       | ✅ (fetch)    | ✅          |
-| `quick-lru`     | LRU (2-segment) | partial        | ❌               | ✅   | ❌       | ❌            | ✅          |
+| **caffeine-js** | **W-TinyLFU**   | ✅             | ✅              | ✅  | ✅      | ✅           | ✅         |
+| `lru-cache`     | LRU             | ❌             | ❌              | ✅  | ✅      | ✅ (fetch)   | ✅         |
+| `quick-lru`     | LRU (2-segment) | partial        | ❌              | ✅  | ❌      | ❌           | ✅         |
 
 See [docs/why-w-tinylfu.md](docs/why-w-tinylfu.md) for a full explainer of the policy.
 

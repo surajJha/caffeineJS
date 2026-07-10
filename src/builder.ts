@@ -6,6 +6,7 @@ import type {
   AsyncLoadingCache,
   Cache,
   CacheOptions,
+  Expiry,
   RemovalListener,
 } from "./types.js";
 import type { ObserverCallback, ObserverOptions } from "./inspect/events.js";
@@ -76,6 +77,15 @@ export class CacheBuilder<K, V> {
     return this;
   }
 
+  /**
+   * Use a per-entry expiry calculator. Mutually exclusive with
+   * `expireAfterWrite` and `expireAfterAccess`.
+   */
+  expireAfter(expiry: Expiry<K, V>): this {
+    this.options.expireAfter = expiry;
+    return this;
+  }
+
   /** Inject a millisecond time source (default `Date.now`). */
   clock(clock: () => number): this {
     this.options.clock = clock;
@@ -91,10 +101,7 @@ export class CacheBuilder<K, V> {
    * Attach an event observer to see hit/miss/admit/reject/promote/demote/evict
    * events in real time. Zero overhead when not registered.
    */
-  observer(
-    callback: ObserverCallback<K, V>,
-    options?: ObserverOptions,
-  ): this {
+  observer(callback: ObserverCallback<K, V>, options?: ObserverOptions): this {
     this.options.observer = new CacheObserver<K, V>(callback, options);
     return this;
   }
@@ -109,8 +116,6 @@ export class CacheBuilder<K, V> {
   }
 }
 
-export function caffeine<K, V>(
-  options: CacheOptions<K, V>,
-): CacheBuilder<K, V> {
+export function caffeine<K, V>(options: CacheOptions<K, V>): CacheBuilder<K, V> {
   return new CacheBuilder<K, V>(options);
 }

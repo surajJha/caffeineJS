@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { caffeine } from "../src/index.js";
-import { serveDashboard } from "../src/dashboard/server.js";
+// Run after `npm run build` so the demos exercise the published artifacts.
+import { caffeine } from "../dist/index.mjs";
+import { serveDashboard } from "../dist/dashboard/server.mjs";
 
 const cache = caffeine({ maximumSize: 200, recordStats: true, adaptive: true }).build();
 const server = await serveDashboard(cache, { port: 8765 });

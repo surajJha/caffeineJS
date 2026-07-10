@@ -2,13 +2,12 @@ import { describe, it, expect } from "vitest";
 import { caffeine } from "../src/index.js";
 import { estimateBytes, sizeOfValue } from "../src/estimate.js";
 
-describe("weighted entries (CAFF-022)", () => {
+describe("weighted entries", () => {
   it("bounds total weight, not count", () => {
     const c = caffeine<string, string>({})
       .maximumWeight(100, (_k, v) => v.length)
       .build();
     for (let i = 0; i < 50; i++) c.set(`k${i}`, "x".repeat(10));
-    // weightedSize is kept <= 100 after every write.
     let total = 0;
     for (const v of c.values()) total += v.length;
     expect(total).toBeLessThanOrEqual(100);
@@ -22,8 +21,8 @@ describe("weighted entries (CAFF-022)", () => {
       .build();
     c.set("a", "x".repeat(90));
     expect(c.get("a")).toBeDefined();
-    c.set("a", "y".repeat(10)); // shrink a from 90 -> 10
-    c.set("b", "z".repeat(80)); // 10 + 80 = 90 <= 100, both fit
+    c.set("a", "y".repeat(10));
+    c.set("b", "z".repeat(80));
     expect(c.get("a")).toBe("y".repeat(10));
     expect(c.get("b")).toBe("z".repeat(80));
   });
@@ -32,8 +31,8 @@ describe("weighted entries (CAFF-022)", () => {
     const c = caffeine<string, string>({})
       .maximumWeight(50, (_k, v) => v.length)
       .build();
-    c.set("small", "abc"); // weight 3
-    c.set("huge", "x".repeat(100)); // weight 100 > 50 bound
+    c.set("small", "abc");
+    c.set("huge", "x".repeat(100));
     let total = 0;
     for (const v of c.values()) total += v.length;
     expect(total).toBeLessThanOrEqual(50);
@@ -41,8 +40,8 @@ describe("weighted entries (CAFF-022)", () => {
 
   it("grows the store past its initial capacity", () => {
     const c = caffeine<number, number>({})
-      .maximumWeight(1_000_000, () => 1) // weight 1 -> effectively count bound
-      .expectedEntries(16) // tiny initial store, must grow
+      .maximumWeight(1_000_000, () => 1)
+      .expectedEntries(16)
       .build();
     for (let i = 0; i < 5000; i++) c.set(i, i * 2);
     expect(c.size).toBe(5000);
@@ -51,13 +50,30 @@ describe("weighted entries (CAFF-022)", () => {
   });
 
   it("validates configuration", () => {
-    expect(() => caffeine<string, number>({}).build()).toThrow(); // no bound
+    expect(() => caffeine<string, number>({}).build()).toThrow();
     expect(() =>
       caffeine<string, number>({ maximumSize: 10, maximumWeight: 10 }).build(),
-    ).toThrow(); // both
-    expect(() =>
-      caffeine<string, number>({ maximumWeight: 10 }).build(),
-    ).toThrow(); // weight without weigher
+    ).toThrow();
+    expect(() => caffeine<string, number>({ maximumWeight: 10 }).build()).toThrow();
+    for (const maximumWeight of [0, -1, Number.POSITIVE_INFINITY, Number.NaN]) {
+      expect(() => caffeine<string, number>({ maximumWeight, weigher: () => 1 }).build()).toThrow(
+        /maximumWeight/,
+      );
+    }
+    for (const expectedEntries of [0, -1, 1.2, Number.POSITIVE_INFINITY, Number.NaN]) {
+      expect(() =>
+        caffeine<string, number>({ maximumWeight: 10, weigher: () => 1, expectedEntries }).build(),
+      ).toThrow(/expectedEntries/);
+    }
+  });
+
+  it("rejects invalid weight results", () => {
+    for (const bad of [-1, Number.POSITIVE_INFINITY, Number.NaN]) {
+      const c = caffeine<string, string>({})
+        .maximumWeight(10, () => bad)
+        .build();
+      expect(() => c.set("bad", "value")).toThrow(/weigher/);
+    }
   });
 
   it("rejects TTL combined with weight bounding in v1", () => {
@@ -69,7 +85,7 @@ describe("weighted entries (CAFF-022)", () => {
   });
 });
 
-describe("byte estimator (CAFF-027)", () => {
+describe("byte estimator", () => {
   it("estimates strings, numbers, and typed arrays", () => {
     expect(sizeOfValue("abcd")).toBe(4 * 2 + 16);
     expect(sizeOfValue(42)).toBe(8);
@@ -88,9 +104,7 @@ describe("byte estimator (CAFF-027)", () => {
   });
 
   it("drives an approximate byte-bounded cache", () => {
-    const c = caffeine<string, string>({})
-      .maximumWeight(2000, estimateBytes) // small byte budget
-      .build();
+    const c = caffeine<string, string>({}).maximumWeight(2000, estimateBytes).build();
     for (let i = 0; i < 100; i++) c.set(`k${i}`, "x".repeat(50));
     let total = 0;
     for (const [k, v] of c.entries()) total += estimateBytes(k, v);

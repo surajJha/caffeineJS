@@ -129,11 +129,23 @@ function benchCaffeine(kind: KeyType, stream: Int32Array): Row {
 
 function table(rows: Row[]): void {
   console.log(
-    ["cache".padEnd(22), "fill".padEnd(15), "hot-get".padEnd(15), "mixed".padEnd(15), "heapMB"].join(""),
+    [
+      "cache".padEnd(22),
+      "fill".padEnd(15),
+      "hot-get".padEnd(15),
+      "mixed".padEnd(15),
+      "heapMB",
+    ].join(""),
   );
   for (const r of rows) {
     console.log(
-      [r.name.padEnd(22), r.fill.padEnd(15), r.hotGet.padEnd(15), r.mixed.padEnd(15), r.heapMB.toFixed(1)].join(""),
+      [
+        r.name.padEnd(22),
+        r.fill.padEnd(15),
+        r.hotGet.padEnd(15),
+        r.mixed.padEnd(15),
+        r.heapMB.toFixed(1),
+      ].join(""),
     );
   }
 }

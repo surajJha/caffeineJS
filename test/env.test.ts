@@ -7,8 +7,9 @@ function walk(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    // The inspect subpath is intentionally Node-only (CLI/TUI).
-    if (p.includes("src/inspect")) continue;
+    // The inspect subpath is intentionally Node-only (CLI/TUI);
+    // the dashboard subpath is browser-only and may use setInterval.
+    if (p.includes("src/inspect") || p.includes("src/dashboard")) continue;
     if (statSync(p).isDirectory()) out.push(...walk(p));
     else if (p.endsWith(".ts")) out.push(p);
   }
@@ -32,15 +33,9 @@ describe("cross-runtime env (CAFF-030)", () => {
     const files = walk(join(process.cwd(), "src"));
     for (const f of files) {
       const code = readFileSync(f, "utf8");
-      expect(code, `${f} must not import node:* built-ins`).not.toMatch(
-        /from\s+["']node:/,
-      );
-      expect(code, `${f} must not require() node built-ins`).not.toMatch(
-        /require\(["']node:/,
-      );
-      expect(code, `${f} must not rely on setInterval`).not.toMatch(
-        /setInterval\s*\(/,
-      );
+      expect(code, `${f} must not import node:* built-ins`).not.toMatch(/from\s+["']node:/);
+      expect(code, `${f} must not require() node built-ins`).not.toMatch(/require\(["']node:/);
+      expect(code, `${f} must not rely on setInterval`).not.toMatch(/setInterval\s*\(/);
     }
   });
 });

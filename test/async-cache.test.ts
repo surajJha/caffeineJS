@@ -1,9 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { caffeine } from "../src/index.js";
 
-const tick = () => new Promise((r) => setTimeout(r, 0));
-
-describe("async loading cache (CAFF-025)", () => {
+describe("async loading cache", () => {
   it("loads on miss and serves from cache on hit", async () => {
     const loader = vi.fn(async (k: string) => `v:${k}`);
     const c = caffeine<string, string>({ maximumSize: 100 }).buildAsync(loader);
@@ -15,9 +13,7 @@ describe("async loading cache (CAFF-025)", () => {
 
   it("coalesces concurrent misses into a single loader call", async () => {
     let resolve!: (v: number) => void;
-    const loader = vi.fn(
-      () => new Promise<number>((res) => (resolve = res)),
-    );
+    const loader = vi.fn(() => new Promise<number>((res) => (resolve = res)));
     const c = caffeine<string, number>({ maximumSize: 100 }).buildAsync(loader);
     const p1 = c.get("k");
     const p2 = c.get("k");
@@ -45,11 +41,8 @@ describe("async loading cache (CAFF-025)", () => {
       if (calls === 1) throw new Error("fail");
       return "ok";
     });
-    const c = caffeine<string, string>({ maximumSize: 100 })
-      .recordStats()
-      .buildAsync(loader);
+    const c = caffeine<string, string>({ maximumSize: 100 }).recordStats().buildAsync(loader);
     await expect(c.get("a")).rejects.toThrow("fail");
-    // A subsequent get retries (pending entry was cleared).
     expect(await c.get("a")).toBe("ok");
     expect(c.stats().loadFailureCount).toBe(1);
     expect(c.stats().loadSuccessCount).toBe(1);
@@ -60,10 +53,10 @@ describe("async loading cache (CAFF-025)", () => {
     const loader = () => new Promise<string>((res) => (resolve = res));
     const c = caffeine<string, string>({ maximumSize: 100 }).buildAsync(loader);
     const p = c.get("a");
-    c.invalidate("a"); // supersede the in-flight load
+    c.invalidate("a");
     resolve("stale");
-    expect(await p).toBe("stale"); // the awaiter still gets its result
-    expect(c.getIfPresent("a")).toBeUndefined(); // but it is not published
+    expect(await p).toBe("stale");
+    expect(c.getIfPresent("a")).toBeUndefined();
   });
 
   it("does not overwrite a value set while its load was pending", async () => {
@@ -71,7 +64,7 @@ describe("async loading cache (CAFF-025)", () => {
     const loader = () => new Promise<string>((res) => (resolve = res));
     const c = caffeine<string, string>({ maximumSize: 100 }).buildAsync(loader);
     const p = c.get("a");
-    c.set("a", "fresh"); // direct write supersedes the load
+    c.set("a", "fresh");
     resolve("stale");
     await p;
     expect(c.getIfPresent("a")).toBe("fresh");
@@ -79,12 +72,10 @@ describe("async loading cache (CAFF-025)", () => {
 
   it("refresh serves the old value until the new one resolves", async () => {
     let n = 0;
-    const c = caffeine<string, number>({ maximumSize: 100 }).buildAsync(
-      async () => ++n,
-    );
+    const c = caffeine<string, number>({ maximumSize: 100 }).buildAsync(async () => ++n);
     expect(await c.get("a")).toBe(1);
     const rp = c.refresh("a");
-    expect(c.getIfPresent("a")).toBe(1); // old value still served
+    expect(c.getIfPresent("a")).toBe(1);
     expect(await rp).toBe(2);
     expect(c.getIfPresent("a")).toBe(2);
   });
@@ -106,10 +97,31 @@ describe("async loading cache (CAFF-025)", () => {
     await p;
   });
 
+  it("does not publish a refresh after invalidateAll", async () => {
+    let resolve!: (v: string) => void;
+    let value = "initial";
+    const loader = () => {
+      const next = value;
+      return new Promise<string>((res) => {
+        resolve = () => res(next);
+      });
+    };
+    const c = caffeine<string, string>({ maximumSize: 100 }).buildAsync(loader);
+
+    const first = c.get("a");
+    resolve("initial");
+    expect(await first).toBe("initial");
+
+    value = "stale-refresh";
+    const refresh = c.refresh("a");
+    c.invalidateAll();
+    resolve("stale-refresh");
+    expect(await refresh).toBe("stale-refresh");
+    expect(c.getIfPresent("a")).toBeUndefined();
+  });
+
   it("bulkGet loads only missing keys via the bulk loader", async () => {
-    const c = caffeine<string, number>({ maximumSize: 100 }).buildAsync(
-      async () => -1,
-    );
+    const c = caffeine<string, number>({ maximumSize: 100 }).buildAsync(async () => -1);
     c.set("a", 1);
     const bulk = vi.fn(async (keys: string[]) => new Map(keys.map((k) => [k, k.length])));
     const result = await c.bulkGet(["a", "bb", "ccc"], bulk);
@@ -125,11 +137,6 @@ describe("async loading cache (CAFF-025)", () => {
     const result = await c.bulkGet(["x", "y", "x"]);
     expect(result.get("x")).toBe("X");
     expect(result.get("y")).toBe("Y");
-    expect(loader).toHaveBeenCalledTimes(2); // "x" deduped
-  });
-
-  it("await tick keeps ordering deterministic", async () => {
-    await tick();
-    expect(true).toBe(true);
+    expect(loader).toHaveBeenCalledTimes(2);
   });
 });

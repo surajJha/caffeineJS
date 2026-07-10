@@ -150,10 +150,7 @@ export class CacheObserver<K, V> implements ICacheObserver<K, V> {
     this.send(event);
   }
 
-  emitMiss(args: {
-    key: K;
-    occupancy: Occupancy;
-  }): void {
+  emitMiss(args: { key: K; occupancy: Occupancy }): void {
     if (this.skip()) return;
     const event: MissEvent<K, V> = {
       type: "miss",
@@ -203,13 +200,7 @@ export class CacheObserver<K, V> implements ICacheObserver<K, V> {
     this.send(event);
   }
 
-  emitPromote(args: {
-    key: K;
-    value: V;
-    hash: number;
-    freq: number;
-    occupancy: Occupancy;
-  }): void {
+  emitPromote(args: { key: K; value: V; hash: number; freq: number; occupancy: Occupancy }): void {
     if (this.skip()) return;
     const event: PromoteEvent<K, V> = {
       type: "promote",
@@ -221,13 +212,7 @@ export class CacheObserver<K, V> implements ICacheObserver<K, V> {
     this.send(event);
   }
 
-  emitDemote(args: {
-    key: K;
-    value: V;
-    hash: number;
-    freq: number;
-    occupancy: Occupancy;
-  }): void {
+  emitDemote(args: { key: K; value: V; hash: number; freq: number; occupancy: Occupancy }): void {
     if (this.skip()) return;
     const event: DemoteEvent<K, V> = {
       type: "demote",
@@ -261,11 +246,7 @@ export class CacheObserver<K, V> implements ICacheObserver<K, V> {
     this.send(event);
   }
 
-  emitResize(args: {
-    windowMax: number;
-    protectedMax: number;
-    occupancy: Occupancy;
-  }): void {
+  emitResize(args: { windowMax: number; protectedMax: number; occupancy: Occupancy }): void {
     if (this.skip()) return;
     const event: ResizeEvent<K, V> = {
       type: "resize",

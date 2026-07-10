@@ -102,7 +102,6 @@ export class FrequencySketch {
   increment(h: number): void {
     const h2 = fmix32(h);
     if (this.doorkeeperEnabled && this.doorSet(h2)) {
-      // First sighting: doorkeeper only, don't touch CMS counters.
       if (++this.size >= this.sampleSize) this.reset();
       return;
     }
@@ -121,7 +120,6 @@ export class FrequencySketch {
   private reset(): void {
     const t = this.table;
     for (let i = 0; i < t.length; i++) {
-      // Halve both nibbles of the byte at once.
       t[i] = ((t[i] as number) >> 1) & 0x77;
     }
     this.door.fill(0);

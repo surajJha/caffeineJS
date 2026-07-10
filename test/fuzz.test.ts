@@ -14,7 +14,12 @@ describe("fuzz & stress (CAFF-042)", () => {
     | { type: "advance"; ms: number };
 
   const opArbitrary: fc.Arbitrary<Op> = fc.oneof(
-    fc.record({ type: fc.constant("set" as const), key: keySpace, value: valueSpace, weight: fc.integer({ min: 1, max: 4 }) }),
+    fc.record({
+      type: fc.constant("set" as const),
+      key: keySpace,
+      value: valueSpace,
+      weight: fc.integer({ min: 1, max: 4 }),
+    }),
     fc.record({ type: fc.constant("get" as const), key: keySpace }),
     fc.record({ type: fc.constant("delete" as const), key: keySpace }),
     fc.record({ type: fc.constant("clear" as const) }),
@@ -22,7 +27,9 @@ describe("fuzz & stress (CAFF-042)", () => {
   );
 
   function totalWeight(
-    cache: ReturnType<ReturnType<typeof caffeine<number, { value: number; weight: number }>>["build"]>,
+    cache: ReturnType<
+      ReturnType<typeof caffeine<number, { value: number; weight: number }>>["build"]
+    >,
   ): number {
     let w = 0;
     for (const [, v] of cache.entries()) w += v.weight ?? 1;

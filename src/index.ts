@@ -11,6 +11,7 @@ export type {
   CacheOptions,
   CacheStats,
   Clock,
+  Expiry,
   Occupancy,
   RemovalCause,
   RemovalListener,

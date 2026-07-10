@@ -172,7 +172,7 @@ export class WindowTinyLfu<K, V> {
 
   onAccessBuffered(idx: number): void {
     const len = this.readBufferLen;
-    if (len > 0 && this.readBuffer[len - 1] === idx) return; // coalesce repeats
+    if (len > 0 && this.readBuffer[len - 1] === idx) return;
     if (len >= READ_BUFFER_SIZE) {
       this.drainRead();
       this.readBuffer[0] = idx;
@@ -203,11 +203,11 @@ export class WindowTinyLfu<K, V> {
     this.sketch.increment(this.store.hashAt(idx));
     const seg = this.store.segment[idx];
     if (seg === WINDOW) {
-      if (this.store.front(this.store.WINDOW_HEAD) === idx) return; // already MRU
+      if (this.store.front(this.store.WINDOW_HEAD) === idx) return;
       this.store.unlink(idx);
       this.store.pushFront(this.store.WINDOW_HEAD, idx);
     } else if (seg === PROTECTED) {
-      if (this.store.front(this.store.PROTECTED_HEAD) === idx) return; // already MRU
+      if (this.store.front(this.store.PROTECTED_HEAD) === idx) return;
       this.store.unlink(idx);
       this.store.pushFront(this.store.PROTECTED_HEAD, idx);
     } else {
@@ -338,7 +338,6 @@ export class WindowTinyLfu<K, V> {
         occupancy: this.occupancy(),
       });
     }
-    // Make room in protected for this entry's weight.
     while (this.protectedWeight + w > this.protectedMax) {
       const demote = s.back(s.PROTECTED_HEAD);
       if (demote === NIL) break;
@@ -388,8 +387,8 @@ export class WindowTinyLfu<K, V> {
     const s = this.store;
 
     if (this.probationWeight > 0) {
-      const candidate = s.front(s.PROBATION_HEAD); // MRU: most recent demotion
-      const victim = s.back(s.PROBATION_HEAD); // LRU: eviction candidate
+      const candidate = s.front(s.PROBATION_HEAD);
+      const victim = s.back(s.PROBATION_HEAD);
 
       if (candidate === victim || candidate === NIL) {
         return this.evictSlot(victim, PROBATION, sink);
@@ -419,9 +418,9 @@ export class WindowTinyLfu<K, V> {
         }
       }
       if (freqC > freqV) {
-        return this.evictSlot(victim, PROBATION, sink); // admit candidate
+        return this.evictSlot(victim, PROBATION, sink);
       }
-      return this.evictSlot(candidate, PROBATION, sink); // reject candidate
+      return this.evictSlot(candidate, PROBATION, sink);
     }
 
     if (this.protectedWeight > 0) {

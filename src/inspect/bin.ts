@@ -8,11 +8,10 @@
  * Usage:
  *   npx caffeine-inspect
  */
-import { caffeine } from "caffeine-js";
+import { caffeine } from "../index.js";
 import { attachInspector } from "./cli.js";
 
 const CAPACITY = 200;
-const WORKLOAD = 1_000_000;
 const SKEW = 2;
 
 const cache = caffeine<number, number>({ maximumSize: CAPACITY }).build();
@@ -22,8 +21,15 @@ function zipfian(max: number, skew: number): number {
   return Math.floor(max * Math.pow(Math.random(), skew));
 }
 
-let i = 0;
+let running = true;
+process.on("SIGINT", () => {
+  running = false;
+  inspector.stop();
+  process.exit(0);
+});
+
 function tick(): void {
+  if (!running) return;
   // Burst of reads.
   for (let b = 0; b < 200; b++) {
     const k = zipfian(CAPACITY * 5, SKEW);
@@ -31,12 +37,8 @@ function tick(): void {
       cache.set(k, k);
     }
   }
-  i += 200;
-  if (i < WORKLOAD) {
-    setImmediate(tick);
-  } else {
-    setTimeout(() => inspector.stop(), 2000);
-  }
+  setImmediate(tick);
 }
 
+console.log("caffeine-inspect running. Press Ctrl+C to stop.");
 tick();

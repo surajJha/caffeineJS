@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-import { caffeine } from "../src/index.js";
-import { attachInspector } from "../src/inspect/index.js";
+// Run after `npm run build` so the demos exercise the published artifacts.
+import { caffeine } from "../dist/index.mjs";
+import { attachInspector } from "../dist/inspect.mjs";
 
 const cache = caffeine({ maximumSize: 200, recordStats: true, adaptive: true }).build();
 const { stop } = attachInspector(cache, { interval: 500, includeKeys: false });
 
-console.log("CLI inspector running. In a TTY this redraws the screen; here it prints snapshots.\n");
+console.log("CLI inspector running. In a TTY this redraws the screen; here it prints snapshots.");
+console.log("Press Ctrl+C to stop.\n");
 
 let i = 0;
 const interval = setInterval(() => {
@@ -17,9 +19,9 @@ const interval = setInterval(() => {
   i++;
 }, 150);
 
-setTimeout(() => {
+process.on("SIGINT", () => {
   clearInterval(interval);
   stop();
   console.log("\nCLI inspector stopped.");
   process.exit(0);
-}, 5000);
+});

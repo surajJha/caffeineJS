@@ -17,16 +17,13 @@ function measure(
   cap: number,
   adaptive: boolean,
 ): { hitRate: number; windowMax: number } {
-  const c = caffeine<number, number>({ maximumSize: cap, adaptive })
-    .recordStats()
-    .build();
+  const c = caffeine<number, number>({ maximumSize: cap, adaptive }).recordStats().build();
   for (let i = 0; i < trace.length; i++) {
     const k = trace[i] as number;
     if (c.get(k) === undefined) c.set(k, k);
   }
   // Reach into the policy for the tuned window size (validation only).
-  const windowMax = (c as unknown as { policy: { windowMaximum: number } }).policy
-    .windowMaximum;
+  const windowMax = (c as unknown as { policy: { windowMaximum: number } }).policy.windowMaximum;
   return { hitRate: c.stats().hitRate, windowMax };
 }
 
@@ -74,7 +71,9 @@ function row(name: string, cap: number, off: number, on: number, win: number): v
 function main(): void {
   const cap = 10_000;
   const len = 3_000_000;
-  console.log(`\nCAFF-041 adaptive validation — cap=${cap.toLocaleString()}, trace=${len.toLocaleString()}\n`);
+  console.log(
+    `\nCAFF-041 adaptive validation — cap=${cap.toLocaleString()}, trace=${len.toLocaleString()}\n`,
+  );
 
   const zipf = zipfTrace(len, cap * 10, 3);
   const zA = measure(zipf, cap, true);
